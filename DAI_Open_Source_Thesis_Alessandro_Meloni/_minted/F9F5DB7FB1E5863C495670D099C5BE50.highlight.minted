@@ -1,0 +1,28 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{c+c1}{// In monitor\PYGZus{}t.c \PYGZhy{} Loop principale}
+\PYG{+w}{        }\PYG{k}{while}\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{usleep}\PYG{p}{(}\PYG{l+m+mi}{100000}\PYG{p}{)}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// Campionamento a 10 Hz (0.1s)}
+
+\PYG{+w}{            }\PYG{c+c1}{// ... lettura thread\PYGZhy{}safe delle metriche ...}
+
+\PYG{+w}{            }\PYG{c+c1}{// Calcolo throughput istantaneo (Delta)}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{long}\PYG{+w}{ }\PYG{n}{delta\PYGZus{}processed}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{current\PYGZus{}processed}\PYG{+w}{ }\PYG{o}{\PYGZhy{}}\PYG{+w}{ }\PYG{n}{last\PYGZus{}processed}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{c+c1}{// Calcolo Latenza media dell\PYGZsq{}intervallo}
+\PYG{+w}{            }\PYG{k+kt}{double}\PYG{+w}{ }\PYG{n}{interval\PYGZus{}avg\PYGZus{}latency}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mf}{0.0}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{delta\PYGZus{}processed}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                 }\PYG{n}{interval\PYGZus{}avg\PYGZus{}latency}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{delta\PYGZus{}latency\PYGZus{}sum}\PYG{+w}{ }\PYG{o}{/}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{double}\PYG{p}{)}\PYG{n}{delta\PYGZus{}processed}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{            }\PYG{c+c1}{// Lettura e Reset del Picco Coda}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}lock}\PYG{p}{(}\PYG{o}{\PYGZam{}}\PYG{n}{m\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mutex}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{peak\PYGZus{}q}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{m\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{peak\PYGZus{}count}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{m\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{peak\PYGZus{}count}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// Reset per il prossimo intervallo}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}unlock}\PYG{p}{(}\PYG{o}{\PYGZam{}}\PYG{n}{m\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mutex}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{c+c1}{// Persistenza su CSV}
+\PYG{+w}{            }\PYG{n}{fprintf}\PYG{p}{(}\PYG{n}{m\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{csv\PYGZus{}file}\PYG{p}{,}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s}{\PYGZpc{}.1f,\PYGZpc{}lu,\PYGZpc{}.2f,\PYGZpc{}.2f,\PYGZpc{}lu}\PYG{l+s+se}{\PYGZbs{}n}\PYG{l+s}{\PYGZdq{}}\PYG{p}{,}
+\PYG{+w}{                    }\PYG{n}{time\PYGZus{}elapsed}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{delta\PYGZus{}processed}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{peak\PYGZus{}queue\PYGZus{}load}\PYG{p}{,}
+\PYG{+w}{                    }\PYG{n}{interval\PYGZus{}avg\PYGZus{}latency}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{current\PYGZus{}attacks}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\end{MintedVerbatim}

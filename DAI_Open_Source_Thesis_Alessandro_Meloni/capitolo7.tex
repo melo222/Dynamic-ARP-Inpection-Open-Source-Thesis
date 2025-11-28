@@ -1,0 +1,123 @@
+\chapter{Conclusioni e Futuro del Progetto}
+In quest'ultimo capitolo viene conclusa la panoramica attorno al progetto della Dynamic ARP Inspection Open Source, riassumendo i traguardi raggiunti, evidenziando gli aspetti negativi e proponendo dei miglioramenti e delle prospettive per il futuro del progetto. 
+
+    \section{Risultati Ottenuti}
+        Il lavoro di tesi ha portato alla realizzazione di un prototipo software di \textit{Dynamic ARP Inspection} (DAI) pienamente funzionante, capace di operare in ambiente Linux standard senza richiedere hardware di rete proprietario. L'analisi sperimentale condotta ha confermato la validità delle scelte architetturali, permettendo di delineare i seguenti traguardi principali:
+
+        \subsubsection*{Efficacia della Protezione e Detection Rate}
+            Il primo e più importante risultato è la conferma della correttezza logica del sistema. In tutti gli scenari di test, inclusi quelli di stress volumetrico (Flood), il modulo di analisi ha dimostrato una capacità di rilevamento del 100\%, identificando correttamente ogni singolo pacchetto ARP malevolo (spoofed) confrontandolo con la \textit{binding table} costruita dai lease DHCP. Il sistema non ha mostrato falsi negativi, garantendo l'integrità della cache ARP della rete protetta.
+
+        \subsubsection*{Scalabilità e Architettura Multi-Thread}
+            La campagna di testing ha evidenziato in modo inequivocabile la superiorità dell'architettura parallela basata sul modello Produttore-Consumatore rispetto all'approccio sequenziale classico.
+            Mentre l'implementazione a singolo thread ha mostrato evidenti limiti di saturazione (Queue Load al 100\%) e latenze nell'ordine dei millisecondi già con carichi di 17.000 PPS, la configurazione multi-thread (4 analizzatori) ha permesso di abbattere la latenza di validazione di circa due ordini di grandezza, stabilizzandola intorno ai \textbf{10-15 $\mu$s}. Questo risultato conferma che l'ispezione del traffico in \textit{user-space}, se adeguatamente parallelizzata, può avvenire in tempo reale senza introdurre ritardi percepibili dagli utenti.
+
+        \subsubsection*{Robustezza e Resilienza al Denial of Service}
+            Un traguardo significativo è la dimostrazione della resilienza del sistema in condizioni critiche. I test di resistenza al DoS hanno provato che, anche quando una parte della rete è soggetta a un attacco massiccio (50.000 PPS) che tenta di saturare le risorse, il traffico legittimo concorrente viene comunque processato e inoltrato. Grazie al tuning della coda (\textit{Queue Size} a 10.000) e alla velocità di smaltimento dei thread, il sistema evita il fenomeno del \textit{packet loss} indiscriminato, garantendo la continuità del servizio (\textit{Availability}) anche sotto assedio.
+
+        \subsubsection*{Democratizzazione della Sicurezza}
+            Infine, il progetto ha raggiunto l'obiettivo prefissato nel Capitolo 2: rendere accessibile una funzionalità di sicurezza avanzata, tipicamente appannaggio di switch \textit{Enterprise} costosi (Cisco, Juniper), utilizzando hardware generico e software Open Source. I risultati dimostrano che un router Linux standard, opportunamente configurato con questo daemon, può svolgere funzioni di sicurezza di Livello 2 con prestazioni comparabili a soluzioni dedicate per reti di piccole e medie dimensioni.
+
+        \section{Limitazioni}
+
+        Nonostante i risultati positivi, il prototipo sviluppato presenta alcune limitazioni intrinseche, derivanti sia dall'ambiente di sviluppo simulato che da scelte progettuali semplificative, che ne circoscrivono l'attuale applicabilità in scenari di produzione complessi.
+
+        \subsubsection{Limitazioni realistiche in ambiente Multi-Rete e Multi Livello}
+            Una prima limitazione riguarda il posizionamento topologico dell'applicativo. Nel contesto simulato, il software DAI è stato eseguito direttamente a bordo del router (gateway), agendo sulle interfacce verso le sottoreti.
+            Questa configurazione differisce dalla classica implementazione DAI \textit{Switch-Based}, dove il controllo avviene sugli switch di accesso (Layer 2) direttamente collegati agli host.
+            
+            Eseguire il DAI sul router protegge efficacemente il gateway e le comunicazioni inter-subnet, ma potrebbe non essere sufficiente a isolare due client malevoli che comunicano tra loro all'interno dello stesso segmento di rete (stesso dominio di broadcast) se il traffico non attraversa il router. In un ambiente reale, l'applicativo dovrebbe idealmente girare su dispositivi che agiscono come switch \textit{managed}.
+
+        \subsubsection{Dipendenza dal Servizio DHCP Locale}
+            La limitazione più critica dell'attuale implementazione risiede nella stretta dipendenza dalla posizione del server DHCP. Il software assume che il servizio DHCP risieda sullo stesso host fisico e accede direttamente al file di lease locale per costruire la tabella di fiducia. A proposito di "tabella di fiducia", non si è inoltre considerata l'affidabilità del servizio e l'integrità di questa tabella nel caso di cui sopra, dove DHCP non risieda nello stesso dispositivo di rete.
+
+            Questa assunzione di "DHCP affidabile e locale" non rispecchia la realtà delle reti strutturate o Enterprise, dove il server DHCP è spesso centralizzato, remoto o distribuito su macchine dedicate diverse dagli apparati di rete. L'attuale architettura non prevede un meccanismo per acquisire le associazioni IP-MAC da server DHCP remoti (DHCP Snooping remoto), rendendo l'applicativo inefficace in topologie dove il router non è anche il gestore degli indirizzi.
+            
+
+
+\section{Il Futuro}
+
+In questa sezione finale si discutono le prospettive evolutive del progetto \textit{Dynamic ARP Inspection Open Source}. Partendo dalla solida base architetturale validata dai test, vengono proposte linee di sviluppo per l'ottimizzazione del codice, l'espansione delle funzionalità e l'integrazione in topologie di rete complesse.
+
+    \subsection{Miglioramenti Attualmente Praticabili}
+
+    Questa categoria include ottimizzazioni implementabili direttamente sull'attuale codebase per migliorarne l'efficienza e la capacità diagnostica.
+
+        \subsubsection{Attività di Log Completa e Granulare}
+        Attualmente, il sistema produce un log aggregato globale. Un'evoluzione necessaria per l'impiego in produzione è l'implementazione del \textbf{Log-by-Network} (o \textit{Log-by-Interface}).
+        
+        Questa funzionalità prevede la strutturazione dei file di log in modo gerarchico o separato per ogni interfaccia monitorata (es. \texttt{dai\_log\_enp0s8.csv}, \texttt{dai\_log\_enp0s9.csv}).
+        Ciò permetterebbe agli amministratori di rete di isolare rapidamente l'origine di un attacco e di generare statistiche di carico specifiche per sottorete, migliorando notevolmente le capacità di \textit{network forensics} e troubleshooting. 
+        % Inoltre, sarebbe auspicabile l'integrazione con il protocollo \textit{Syslog} per centralizzare gli alert su server SIEM remoti.
+
+        \subsubsection{Prestazioni e Strutture Dati}
+        Come analizzato nel capitolo relativo all'implementazione, l'attuale meccanismo di validazione si basa su una ricerca sequenziale all'interno di un array dinamico. Sebbene efficace per reti di dimensioni contenute, questa soluzione presenta una complessità computazionale lineare $O(n)$.
+
+        Una potenziale ottimizzazione architetturale per mitigare questa complessità, senza alterare il modello multi-thread, consisterebbe nella sostituzione della struttura dati sottostante con una \textbf{Tabella Hash} (Hash Map). Utilizzando l'indirizzo IP come chiave di hashing per la ricerca (o, più robustamente, una pair $\langle IP, MAC \rangle$), la complessità della ricerca nel caso medio si ridurrebbe drasticamente a $O(1)$, ovvero a tempo costante. 
+
+        Questa modifica garantirebbe una lookup quasi istantanea indipendentemente dal numero di host connessi, aumentando significativamente la scalabilità del modulo di validazione verso reti con migliaia di client, a fronte di un lieve aumento della complessità nell'implementazione della funzione di aggiornamento e nella gestione delle collisioni di hash.
+
+    \subsection{Funzionalità Sostanziali}
+
+    In questa sezione vengono proposte funzionalità che estendono il perimetro d'azione del software per superare le limitazioni topologiche attuali.
+
+        \subsubsection*{Funzionamento in assenza di DHCP Server Locale}
+        Per superare la dipendenza dal file di lease locale, il progetto dovrebbe evolvere verso un'architettura ibrida capace di popolare la \textit{binding table} tramite fonti esterne.
+        Le soluzioni prospettate sono due:
+
+        \begin{itemize}
+            \item \textbf{DHCP Snooping Passivo:} Implementare un modulo "sniffer" dedicato che intercetta i pacchetti \texttt{DHCP ACK} transitanti sulla rete (anche se generati da server remoti) per costruire dinamicamente il database delle associazioni fidate, replicando il comportamento degli switch hardware.
+            \item \textbf{Sincronizzazione Remota:} Sviluppare un'API per interrogare database centralizzati o rendere i file di lease condivisi via rete, permettendo al DAI di operare su nodi di rete che non svolgono funzioni di DHCP server.
+        \end{itemize}
+
+        \subsubsection*{Packet Rate Limiting e Protezione DoS}
+        Sebbene i test abbiano dimostrato che il DAI è in grado di reggere carichi elevatissimi (oltre 34k PPS), l'introduzione di un meccanismo di \textit{Rate Limiting} rimane una \textit{best practice} di sicurezza.
+        Implementare un algoritmo di \textit{Token Bucket} per limitare il numero di pacchetti ARP accettati per secondo da uno specifico MAC address o interfaccia servirebbe a:
+
+        \begin{itemize}
+            \item Prevenire il sovraccarico della CPU in scenari ancora più estremi di quelli testati.
+            \item Isolare automaticamente host compromessi che generano flood, evitando che il "rumore" del traffico inutile si propaghi sulla rete, proteggendo non solo il router DAI ma anche gli altri host del dominio di broadcast.
+        \end{itemize}
+
+    \subsection{Evoluzione Complessiva}
+
+    Infine, si discute l'evoluzione del software da strumento di rilevamento passivo a sistema di prevenzione attiva.
+
+        \subsubsection{Passaggio da IDS a IPS (Intrusion Prevention System)}
+        L'attuale implementazione agisce principalmente come un IDS (\textit{Intrusion Detection System}), rilevando l'attacco ma senza bloccare fisicamente il pacchetto a livello kernel prima che venga inoltrato (sebbene l'architettura lo permetta teoricamente).
+        Per trasformare il sistema in un IPS puro, si possono percorrere due strade:
+
+        \begin{enumerate}
+            \item \textbf{In-Line Blocking (Netfilter):} Integrare il software con le code di \textit{Netfilter} (NFQUEUE) per intercettare i pacchetti in user-space, decidere il verdetto (ACCEPT/DROP) e comunicarlo al kernel. Questo approccio garantisce il blocco preventivo ma introduce una latenza inevitabile per ogni pacchetto.
+            
+            \item \textbf{Active Remediation (Gratuitous ARP):} Un approccio alternativo, che non introduce latenza sul traffico legittimo, consiste nel non bloccare il pacchetto sospetto in attesa di analisi, ma reagire "a posteriori" in tempo reale. \\
+            Alla ricezione di un pacchetto malevolo, si opera per "immobilizzare" il MAC mittente, bloccando il suo traffico e limitando i danni in corso. I destinatari di tali pacchetti, vittime di un avvelenamento delle proprie tabelle ARP, devono essere ripristinati allo stato antecedente l'attacco.\\
+            Il sistema invia immediatamente un \textbf{Gratuitous ARP Reply} correttivo unicast alle vittime. Questo pacchetto "curativo" sovrascrive immediatamente l'entry avvelenata nella cache delle vittime, annullando l'effetto dell'attacco man-in-the-middle in pochi millisecondi. Questa soluzione privilegia la continuità del servizio e la velocità, evitando colli di bottiglia sul traffico in transito.
+        \end{enumerate}
+
+
+
+
+    % \section{Il Futuro}
+    % In tal occasione, si vuole discutere riguardo alle prospettive future del progetto \textit{Dynamic ARP Inspection Open Source} in ottica di miglioramento ed integrazione ottimale.
+    
+    %     \subsection{Miglioramenti Praticabili}
+
+    %         \subsubsection{Attività di Log Completa}
+    %         file di log e opzioni di log-by-network, ovvero logging delle attività per ogni rete coinvolta, così da avere una logica di report suddivisa per ogni rete.
+
+    %         \subsubsection{Prestazioni}
+    %         % paragrafo tolto nella spiegazione della ricerca nella tabella cache delle lease DHCP per alleggerire quella sezione, inoltre sarebbe meglio interirla in questi capitolo conclusivi e di argomentazione sul progetto.
+    %         Una potenziale ottimizzazione architetturale per mitigare questa complessità, senza alterare il modello multi-thread, consisterebbe nella sostituzione della struttura dati sottostante. Invece di un array dinamico, si potrebbe impiegare una struttura a Tabella Hash (Hash Map). Utilizzando l'indirizzo IP come chiave di hashing per la ricerca (o, più robustamente, una pair ⟨IP, MAC⟩), la complessità della ricerca nel caso medio si ridurrebbe drasticamente a $O(1)$, ovvero a tempo costante. Questa modifica garantirebbe una lookup quasi istantanea e aumenterebbe significativamente la scalabilità del modulo di validazione, a fronte di un lieve aumento della complessità nell'implementazione della funzione di update e nella gestione delle collisioni di hash. 
+
+    %     \subsection{Feature Sostanziali}
+
+    %         \subsubsection{Funzionamento in assenza del DHCP Server nel dispostivo Host del DAI Open Source}
+
+    %         \subsubsection{Packet Rate Limiting per ridurre il rischio di DoS}
+            
+        
+    %     \subsection{Apparati e Modalità Aggiuntive}
+
+    %         \subsubsection{Passaggio da IDS a IPS}
+    %         Implementare \texttt{DROP} delle ARP Reply dannose prima di ritrasmetterle nella rete. (primo approccio)
+    %         Oppure, senza dover avere uno (o N in caso di Flooding) pacchetto pendente durante un possibile traffico pesante in corso, si potrebbe bloccare la porta verso l'host malevolo e riparare con Gratuitous ARP Reply in base alla tabella delle Lease DHCP a tutti gli host per ripristinare le tabelle ARP potenzialmente compromesse. In questo modo non si ha latenza per i pacchetti pendenti in attesa di validazione. 

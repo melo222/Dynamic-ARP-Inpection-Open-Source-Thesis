@@ -1,0 +1,33 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{         }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{o}{*}\PYG{n+nf}{receiver\PYGZus{}thread}\PYG{p}{(}\PYG{k+kt}{void}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{args}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{receiver\PYGZus{}t\PYGZus{}args}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{t\PYGZus{}args}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{receiver\PYGZus{}t\PYGZus{}args}\PYG{+w}{ }\PYG{o}{*}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{args}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pcap\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{handle}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{bpf\PYGZus{}program}\PYG{+w}{ }\PYG{n}{fp}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{bpf\PYGZus{}u\PYGZus{}int32}\PYG{+w}{ }\PYG{n}{net}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{.}\PYG{p}{.}\PYG{p}{.}
+\PYG{+w}{            }\PYG{n}{handle}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pcap\PYGZus{}open\PYGZus{}live}\PYG{p}{(}\PYG{n}{t\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{interface}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{BUFSIZ}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{1000}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{errbuf}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{arp\PYGZus{}filter}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+s}{\PYGZdq{}}\PYG{l+s}{arp and arp[7] == 2}\PYG{l+s}{\PYGZdq{}}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pcap\PYGZus{}compile}\PYG{p}{(}\PYG{n}{handle}\PYG{p}{,}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{n}{fp}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}filter}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{net}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pcap\PYGZus{}setfilter}\PYG{p}{(}\PYG{n}{handle}\PYG{p}{,}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{n}{fp}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{pcap\PYGZus{}pkthdr}\PYG{+w}{ }\PYG{n}{header}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{packet}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{packet}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{pcap\PYGZus{}next}\PYG{p}{(}\PYG{n}{handle}\PYG{p}{,}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{n}{header}\PYG{p}{)}\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{packet}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                    }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{header}\PYG{p}{.}\PYG{n}{caplen}\PYG{+w}{ }\PYG{o}{\PYGZgt{}}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{14}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{28}\PYG{p}{)}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{mac\PYGZus{}sender}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{packet}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{6}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{arp\PYGZus{}header}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{packet}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{14}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{mac\PYGZus{}bind}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}header}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{8}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{ip\PYGZus{}bind}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}header}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{14}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{n}{association}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{n}{memcpy}\PYG{p}{(}\PYG{n}{association}\PYG{p}{.}\PYG{n}{mac\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}bind}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{n}{memcpy}\PYG{p}{(}\PYG{o}{\PYGZam{}}\PYG{n}{association}\PYG{p}{.}\PYG{n}{ip\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}bind}\PYG{p}{,}\PYG{+w}{ }\PYG{l+m+mi}{4}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{n}{memcpy}\PYG{p}{(}\PYG{n}{association}\PYG{p}{.}\PYG{n}{mac\PYGZus{}addr\PYGZus{}sender}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}sender}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{.}\PYG{p}{.}\PYG{p}{.}
+\PYG{+w}{                        }\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{arp\PYGZus{}queue}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{t\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{p}{;}
+\PYG{+w}{                        }\PYG{n}{enqueue\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{arp\PYGZus{}queue}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{association}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{                    }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{               }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\end{MintedVerbatim}

@@ -1,0 +1,20 @@
+# LaTeX temporary files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.lof
+*.lot
+*.run.xml
+*.bcf
+
+# PDF (Opzionale: rimuovi il # se vuoi ignorare anche il PDF generato)
+# *.pdf
+
+# VS Code directory
+.vscode/

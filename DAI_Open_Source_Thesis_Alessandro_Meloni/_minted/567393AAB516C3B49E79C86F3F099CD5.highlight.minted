@@ -1,0 +1,25 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{c+c1}{// Estensione della struttura pacchetto con timestamp}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}addr}\PYG{p}{[}\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{in\PYGZus{}addr}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}addr}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}addr\PYGZus{}sender}\PYG{p}{[}\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{timespec}\PYG{+w}{ }\PYG{n}{reception\PYGZus{}time}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// Timestamp (CLOCK\PYGZus{}MONOTONIC)}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Struttura per le metriche globali condivise}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{long}\PYG{+w}{ }\PYG{n}{total\PYGZus{}processed}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// Totale pacchetti analizzati}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{long}\PYG{+w}{ }\PYG{n}{attacks\PYGZus{}detected}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// Totale attacchi rilevati}
+\PYG{+w}{            }\PYG{k+kt}{double}\PYG{+w}{ }\PYG{n}{total\PYGZus{}latency\PYGZus{}accum}\PYG{p}{;}\PYG{+w}{     }\PYG{c+c1}{// Accumulatore latenza (per calcolo media)}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{n}{mutex}\PYG{p}{;}\PYG{+w}{          }\PYG{c+c1}{// Mutex per accesso concorrente}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{dai\PYGZus{}metrics\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Aggiunta del Peak Meter nella Coda}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// ... altri campi (buffer, head, tail) ...}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{count}\PYG{p}{;}\PYG{+w}{      }\PYG{c+c1}{// Elementi attuali}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{peak\PYGZus{}count}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// Massimo picco raggiunto nell\PYGZsq{}intervallo}
+\PYG{+w}{            }\PYG{c+c1}{// ... mutex e condition variables ...}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{p}{;}
+\end{MintedVerbatim}

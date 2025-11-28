@@ -1,0 +1,79 @@
+\chapter{Open Source}
+La nostra implementazione del daemon di ispezione ARP si innesta in un contesto tecnologico in cui la scelta del paradigma di sviluppo Open Source non costituisce una mera preferenza operativa, ma una decisione strategica che riflette i principi di trasparenza, affidabilità e collaborazione fondamentali per la realizzazione di applicazioni critiche per la sicurezza \cite{damiani2009open}. Il Software Open Source (OSS) si definisce per l'accesso illimitato al codice sorgente, conferendo agli utenti le libertà di studiare, modificare e ridistribuire il software stesso, come stabilito dalle licenze aperte.
+
+Questa filosofia è in netta contrapposizione con il modello proprietario (Closed Source), dove il codice rimane celato, limitando l'intervento e l'analisi da parte di terzi. La scelta di fondare il progetto su un framework e su componenti Open Source assicura l'aderenza a standard rigorosi di interoperabilità, promuovendo al contempo una portabilità essenziale per un'applicazione destinata a operare a stretto contatto con il kernel del sistema operativo.
+
+Nel campo della sicurezza informatica, in particolare, la trasparenza del codice sorgente consente un controllo continuo e collettivo \cite{damiani2009open}, un meccanismo che, secondo le stesse parole di Linus Torvalds \cite{torvalds2007closed}, accelera l'identificazione e la correzione delle vulnerabilità in modo più efficiente rispetto ai cicli di sviluppo chiusi. 
+Pertanto, l'adozione dell'Open Source in questa tesi supporta l'integrazione di componenti software di rete noti per la loro robustezza e affidabilità nel tempo, allineandosi a una visione di sicurezza partecipata, dove la solidità del sistema è garantita dalla revisione e dal contributo di una comunità estesa, trasformando l'infrastruttura di base in un bene comune digitale.
+
+    \section{Introduzione e Definizione}
+    La genesi storica dell'Open Source affonda le radici negli anni '80, in un periodo in cui la nascente industria del software proprietario iniziava a limitare l'accesso al codice sorgente, un'azione che interruppe la tradizionale prassi accademica e di ricerca di condivisione del codice. L'impulso decisivo per la formalizzazione di un modello alternativo fu dato da Richard Stallman con la fondazione del Progetto GNU nel 1983 e la successiva creazione della General Public License (GPL). Sebbene il movimento iniziale fosse primariamente filosofico e denominato Free Software, il termine Open Source fu coniato solo nel 1998, in seguito alla decisione di Netscape di rilasciare il codice sorgente del suo browser. Questo cambio terminologico fu strategico: l'obiettivo era enfatizzare il modello di sviluppo pratico e collaborativo (il processo di apertura) piuttosto che la connotazione etica e politica della "libertà", rendendo il concetto più appetibile e accettabile per il mondo business e enterprise.
+
+    La definizione di Open Source, stabilita formalmente dalla Open Source Initiative (OSI), non si limita alla mera disponibilità del codice sorgente. Essa si basa su un insieme rigoroso di dieci criteri che devono essere soddisfatti da una licenza affinché il software possa essere definito "Open Source" a tutti gli effetti. Tali criteri vanno oltre la semplice gratuità d'uso, assicurando che la licenza garantisca la libera ridistribuzione, l'inclusione del codice sorgente e la possibilità di lavori derivati. Crucialmente, la definizione OSI stabilisce anche clausole di non discriminazione contro persone, gruppi o campi di impresa, garantendo la piena fruibilità e il potenziale contributo da parte di qualsiasi soggetto. L'autorità dell'OSI è fondamentale, in quanto essa funge da garante che il software etichettato come Open Source rispetti i principi essenziali di trasparenza e collaborazione comunitaria.
+
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{|p{5cm}|p{9cm}|}
+            \hline
+            \textbf{Criterio} & \textbf{Descrizione Sintetica} \\
+            \hline
+            Libera Ridistribuzione & La licenza non deve impedire la vendita o la donazione del software come componente di una distribuzione. \\
+            \hline
+            Codice Sorgente & Il programma deve includere il codice sorgente e consentirne la libera distribuzione in forma leggibile. \\
+            \hline
+            Lavori Derivati & La licenza deve permettere modifiche e la creazione di opere derivate, consentendone la distribuzione sotto gli stessi termini. \\
+            \hline
+            Integrità del Codice Sorgente dell'Autore & Può essere richiesto che i lavori derivati vengano distribuiti solo come "patch" o che siano chiaramente distinti dall'originale. \\
+            \hline
+            Non Discriminazione contro Persone o Gruppi & La licenza non deve discriminare persone o gruppi di persone. \\
+            \hline
+            Non Discriminazione contro Campi di Impresa & La licenza non deve impedire l'uso del software in uno specifico campo di attività (ad esempio, per scopi commerciali). \\
+            \hline
+            Distribuzione della Licenza & I diritti collegati al programma devono applicarsi a tutti coloro a cui il programma è ridistribuito, senza la necessità di un'ulteriore licenza. \\
+            \hline
+            La Licenza non deve essere Specifica per un Prodotto & I diritti concessi dal programma non devono dipendere dal fatto che esso faccia parte di una specifica distribuzione. \\
+            \hline
+            La Licenza non deve Contaminare altro Software & La licenza non deve imporre restrizioni su altri software che sono distribuiti insieme al programma con licenza aperta. \\
+            \hline
+            La Licenza deve essere Tecnologia Neutra & Nessuna disposizione della licenza deve essere basata su una singola tecnologia o tipo di interfaccia. \\
+            \hline
+        \end{tabular}    
+        \caption{I Dieci Criteri della Definizione Open Source (OSD) secondo la Open Source Initiative (OSI) \cite{OSD_Definition}}
+        \label{tab:osi_ten_criteria}
+    \end{table}
+
+    In questo contesto di sviluppo e licenza, è cruciale operare una distinzione rigorosa tra il Software Open Source e altre categorie di software che, pur essendo spesso distribuite senza oneri economici, non ne condividono la filosofia fondamentale né i diritti legali associati al codice sorgente. Il Freeware, ad esempio, costituisce un modello di distribuzione in cui il software è concesso gratuitamente all'utente finale; tuttavia, rimane un software intrinsecamente proprietario (Closed Source), con il codice sorgente mantenuto segreto. 
+    
+    L'assenza di costo non si traduce in libertà: l'utente è rigorosamente vincolato ai termini della licenza d'uso (EULA) e alle funzionalità predefinite dallo sviluppatore, impedendo lo studio, la modifica o la ridistribuzione. Similmente, il Public Domain (Dominio Pubblico) denota software privo di diritti d'autore (copyright) e quindi liberamente utilizzabile. Tuttavia, questa assenza di licenza, pur garantendo la massima libertà d'uso, non impone e non promuove i principi di governance collaborativa e tracciabilità delle modifiche tipici dell'Open Source. 
+    
+    Di conseguenza, solo l'OSS, attraverso il suo impianto legale e i criteri della definizione OSI, assicura che il codice sorgente sia non solo disponibile, ma che vengano garantiti i diritti di fork e di evoluzione autonoma, elementi essenziali per l'affidabilità a lungo termine e l'adattabilità critica in ambiti come la sicurezza informatica.
+    
+    
+    \section{Differenze tra Open Source e Software Proprietario}
+    Il contrasto tra il paradigma di sviluppo Open Source e il Software Proprietario è fondamentale per comprendere non solo le differenze di licenza, ma anche l'impatto sulla sicurezza, l'innovazione e la governance tecnologica. L'Open Source si manifesta come un acceleratore di miglioramento e beneficio comune, grazie al suo modello intrinsecamente collaborativo e trasparente. La libera accessibilità al codice sorgente elimina le barriere all'innovazione, consentendo a ricercatori e sviluppatori di evolvere su fondamenta tecnologiche già collaudate. 
+    
+    Questa dinamica è alimentata da una peculiare convergenza di interessi: da un lato, esiste una componente di interesse individuale che motiva gli sviluppatori a contribuire, risolvendo problemi specifici e migliorando le proprie competenze. Dall'altro lato, ogni modifica, correzione di bug o miglioramento di funzionalità, anche se originato da un bisogno personale, viene immediatamente reso disponibile alla comunità, in un processo virtuoso in cui l'interesse del singolo si traduce automaticamente in beneficio collettivo, elevando l'affidabilità e la qualità dell'intero ecosistema. 
+    
+    Nel campo della sicurezza informatica, il vantaggio della trasparenza conferita dall'Open Source è insuperabile, trasformando il codice sorgente in un elemento chiave di fiducia e resilienza. Questo si fonda sul principio, spesso citato come Legge di Linus (Linus's Law), secondo cui "più occhi vedono, più facile è trovare l'errore". La disponibilità pubblica del codice garantisce che il software sia sottoposto a un audit continuo e un testing distribuito da parte di una comunità globale di ricercatori, specialisti e sviluppatori. Questo processo collaborativo accelera drasticamente l'identificazione e la correzione delle vulnerabilità, riducendo in modo significativo il "Window Of Exposure", la finestra temporale in cui una falla è sfruttabile.
+
+    Inoltre, la trasparenza del codice contribuisce direttamente alla verificabilità crittografica e alla fiducia nel programma. A differenza del software proprietario, in cui si accettano algoritmi di sicurezza e protocolli assumendo che siano stati implementati correttamente, l'Open Source permette di ispezionare l'implementazione crittografica a livello binario e sorgente. Questo riduce il rischio di fail-open logici\footnote{Con "fail-open logici" si intende un errore di programmazione in un sistema di sicurezza per cui, in caso di malfunzionamento, il sistema fallisce aprendosi (cioè permette l'accesso o il flusso di dati) anziché fallire chiudendosi (bloccando tutto, fail-safe o fail-closed).} e assicura che non siano presenti funzioni nascoste o backdoor malevole. La resistenza a tali manipolazioni è intrinseca, poiché qualsiasi tentativo di infiltrazione nel codice sarebbe potenzialmente scoperto e reso pubblico, salvaguardando l'integrità del sistema.
+    
+    Infine, l'infrastruttura di sviluppo aperta facilita la CIR (Computer Incident Response). Quando una vulnerabilità zero-day viene scoperta in un componente Open Source ampiamente utilizzato, la comunità può immediatamente analizzare la causa, sviluppare e distribuire una patch correttiva in tempi che spesso superano la reattività delle aziende proprietarie, che sono vincolate dai cicli di rilascio interni e dai processi di controllo centralizzati. Per le applicazioni di network monitoring e sicurezza, come quelle trattate in questa tesi, la rapidità di risposta è un fattore critico di resilienza.
+
+    In contrapposizione ai benefici intrinseci dell'Open Source, il modello proprietario introduce rischi significativi, non solo sotto il profilo tecnico, ma anche in termini di Governance del rischio economico e operativo. L'impossibilità di accedere al codice sorgente causa una profonda opacità sui meccanismi interni, impedendo audit indipendenti di terze parti e rendendo necessario un atto di fede assoluta nell'integrità dello sviluppatore. Questo rischio di vulnerabilità, sia intenzionali che involontarie, rimane celato, in quanto il processo di scoperta dei bug è ristretto al controllo interno dell'azienda.
+    
+    Dal punto di vista strategico, il software proprietario impone il fenomeno del Vendor Lock-in, creando una dipendenza tecnologica che va oltre il mero utilizzo del programma. L'utente è costretto a investire in formazione, infrastruttura e dati specifici per l'ecosistema di un unico fornitore. Questa dipendenza limita drasticamente la flessibilità e la capacità di migrazione verso soluzioni alternative, rendendo l'utente vulnerabile a cambiamenti arbitrari nelle politiche di supporto, nei prezzi e nelle condizioni di licenza, con conseguenze potenzialmente distruttive a lungo termine.
+    
+    Infine, il modello Closed Source accentua il rischio di discontinuità del servizio e di obsolescenza programmata. L'innovazione è centralizzata e la sopravvivenza del software è legata alla solidità finanziaria e alle decisioni strategiche dell'azienda produttrice. Qualora l'azienda decidesse di interrompere il supporto (End-of-Life), gli utenti rimarrebbero privi del diritto legale o tecnico di accedere al codice sorgente per correggerlo, evolverlo o mantenerlo. Questa assenza di controllo condanna rapidamente il prodotto all'obsolescenza, minando la longevità e l'affidabilità di sistemi complessi che si basano su tali componenti. In sintesi, mentre il software proprietario ottimizza il controllo e il profitto per il singolo ente, l'Open Source massimizza la resilienza, la sicurezza e l'adattabilità del software, ponendo il sistema tecnologico al servizio della comunità.
+    
+    \section{Open Source nel contesto della Dynamic ARP Inspection}
+
+    Come detto nel capitolo precedente, la Dynamic ARP Inspection è stata concepita e implementata come una caratteristica proprietaria integrata nelle apparecchiature di rete di classe enterprise. Tale integrazione comporta i rischi precedentemente discussi nel paragrafo sopra, risultando limitativa in funzione degli elementi evidenziati in precedenza. Si consideri soprattutto che, per gli amministratori di rete come per gli utenti comuni, risulta impossibile usufruire dell'implementazione qualora non siano in possesso di sistemi enterprise. L'impossibilità di permettersi migliaia di Euro di dispositivi professionali priva gli utenti del diritto a una funzione di sicurezza fondamentale per la mitigazione degli attacchi in LAN private o pubbliche. 
+    
+    L'obiettivo di questo progetto consiste nel democratizzare e rendere integrabile una funzionalità di sicurezza fondamentale. La scelta di implementare DAI utilizzando strumenti e componenti aperti, e senza dipendenza da licenze commerciali, realizza la conversione di una funzionalità semi-proprietaria in una soluzione neutra e funzionale. Questo approccio garantisce immediatamente la trasparenza e la fiducia: il codice sorgente è completamente esposto, consentendo una verifica completa della logica di validazione dei messaggi ARP. L'amministratore di rete non è più tenuto a riporre fiducia implicita nel produttore dell'hardware, ma può verificare l'esatta esecuzione della validazione, elemento cruciale in un meccanismo che interviene attivamente sul flusso del traffico di rete. 
+    
+    Inoltre, basandosi su standard di programmazione aperti, la flessibilità di integrazione è svincolata da specifiche piattaforme hardware. Ciò ne consegue l'installazione su qualsiasi switch, router, server o dispositivo embedded compatibile, offrendo una soluzione di sicurezza perimetrale implementabile su hardware generico e a costo contenuto. Infine, il modello di sviluppo aperto facilita l'adattabilità e l'evoluzione sostenibile: la longevità del progetto non è vincolata alle decisioni di End-of-Life di un singolo fornitore, ma alla capacità della comunità di adattare e migliorare il sistema per mitigare nuove varianti di attacchi di ARP Spoofing che potrebbero emergere. 
+    
+    In sintesi, l'adozione del paradigma Open Source per la Dynamic ARP Inspection è una dimostrazione pratica di come i principi di libertà e trasparenza possano essere impiegati per costruire strumenti di sicurezza più resilienti, affidabili e accessibili rispetto alle tradizionali soluzioni chiuse.
+
+    

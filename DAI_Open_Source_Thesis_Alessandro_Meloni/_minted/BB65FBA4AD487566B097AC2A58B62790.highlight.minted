@@ -1,0 +1,4 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+            \PYGZsh{} Forwarding sulle interfacce interne
+            iptables \PYGZhy{}A FORWARD \PYGZhy{}i enp0s8 \PYGZhy{}o enp0s3 \PYGZhy{}j ACCEPT
+\end{MintedVerbatim}

@@ -1,0 +1,11 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+        interface=enp0s8
+        dhcp\PYGZhy{}range=set:enp0s8.192.168.10.10,192.168.10.20,24h
+        dhcp\PYGZhy{}option=:tag:enp0s8option,router,192.168.10.1
+        dhcp\PYGZhy{}option=tag:enp0s8option:,dns\PYGZhy{}server,8.8.8.8
+
+        interface=enp0s9
+        dhcp\PYGZhy{}range=set:enp0s9,192.168.20.20,192.168.20.30,24h
+        dhcp\PYGZhy{}option=tag:enp0s9,option:router,192.168.20.1
+        dhcp\PYGZhy{}option=tag:enp0s9,option:dns\PYGZhy{}server,8.8.8.8
+\end{MintedVerbatim}

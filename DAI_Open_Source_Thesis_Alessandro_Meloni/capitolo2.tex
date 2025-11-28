@@ -1,0 +1,293 @@
+\chapter{Soluzioni ad ARP Poisoning}
+    Nella letteratura vengono proposte numerose soluzioni a questa vulnerabilità, presentando diversi modi per risolvere le lacune intrinseche del protocollo ARP.  Per chiarezza di analisi, le soluzioni presenti in letteratura sono state suddivise in due gruppi: le proposte distribuite, implementate sui singoli host presenti sulla rete, e quelle centralizzate, implementate sui router.
+    
+    \section{Soluzioni Host-Oriented}
+
+    In primo luogo, presentiamo le soluzioni implementate sui singoli nodi della rete per validare l'intera infrastruttura: un paradigma interessante, ma con alcuni punti critici.
+    
+        \subsection{S-ARP: Secure Address Resolution Protocol di D. Bruschi, A. Ornaghi e E. Rosti}
+        Nell'articolo \cite{S-ARP} viene presentata un'evoluzione del protocollo ARP, estendendolo con robusti meccanismi di autenticazione e integrità basati sulla crittografia asimmetrica per contrastare gli attacchi di ARP poisoning. L'architettura di S-ARP non mira a fornire la riservatezza del traffico, funzione delegata ai livelli superiori dello stack OSI, ma si concentra esclusivamente sull'autenticazione. 
+        
+        Ogni host abilitato a S-ARP possiede una coppia di chiavi pubblica/privata. L'infrastruttura di sicurezza è centralizzata attorno all'Authoritative Key Distributor (AKD), un host fidato che funge da repository di chiavi. L'AKD gestisce il binding tra l'identità dell'host e la sua chiave pubblica, validata dal gestore di rete. Un ruolo critico dell'AKD è anche la distribuzione di un valore di orologio (time-stamp), fondamentale per la sincronizzazione degli host e la prevenzione degli attacchi di replay. Tutti i messaggi ARP Reply sono firmati digitalmente dal mittente con la sua chiave privata. Il destinatario verifica la firma utilizzando la chiave pubblica del mittente, recuperandola dall'AKD se è assente o non valida nella cache locale.
+
+        Nelle reti con indirizzamento dinamico, S-ARP richiede l'implementazione di un S-DHCP personalizzato. Il server S-DHCP comunica con l'AKD per verificare l'autorizzazione di un host e per aggiornare dinamicamente il binding tra la chiave pubblica dell'host e l'indirizzo IP che gli viene assegnato. Questo processo garantisce che, anche in ambienti dinamici, la corrispondenza IP-Chiave sia sempre autenticata dall'autorità fidata.
+        
+        L'adozione di S-ARP, pur offrendo integrità e autenticità a livello crittografico, richiede  un'infrastruttura centralizzata dedicata e una modifica  al protocollo e al software di gestione presente sugli host. Risulta quindi difficile da implementare in reti con elevata eterogeneità dei dispositivi, dove l'integrazione del software viene meno. Inoltre, nelle realtà in cui le reti vengono messe a disposizione di un bacino di utenza libero di accedervi, come le reti pubbliche degli aeroporti o simili, si presenta un fenomeno di alta volatilità dei nodi; ciò comporta l'impossibilità di garantire la presenza di tale protocollo di sicurezza su ogni dispositivo partecipe alla rete, rendendo inutilizzabile tale soluzione. 
+
+        Si vedrà come le difficoltà di compatibilità e l'inefficacia nelle reti ad alto ricambio di host si ripresentano spesso nelle soluzioni non centralizzate.
+
+        \subsection{ArpON}
+        ArpON è una soluzione Open Source ideata e sviluppata da Andrea Di Pasquale per ridurre gli effetti negativi di un attacco ARP Cache Poisoning.\cite{ArpON}
+
+        ArpON è un daemon che opera nello spazio utente del sistema operativo, in parallelo con il protocollo ARP residente nel kernel. L'obiettivo primario di ArpON non è la prevenzione assoluta dell'attacco, quanto la mitigazione rapida degli effetti dell'avvelenamento della cache. Quando si verifica il Cache Poisoning, ArpON interviene per ripristinare la cache ARP del sistema locale a uno stato consistente nel più breve tempo possibile, rendendo l'attacco Man-in-the-Middle praticamente inefficace.
+
+        ArpON è strutturato in tre moduli distinti: SARPI, DARPI e HARPI, ciascuno dei quali affronta un diverso scenario di indirizzamento di rete. Il modulo SARPI (Static ARP Inspection) è dedicato agli ambienti in cui gli indirizzi IP sono assegnati in modo statico e persistente. In questo contesto, SARPI mantiene una propria cache di mapping ⟨IP, MAC⟩ considerati affidabili dalla sincronizzazione periodica e viene forzata nella cache ARP del sistema operativo.
+
+        Il modulo DARPI (Dynamic ARP Inspection) affronta lo scenario più comune delle reti dinamiche, in cui gli indirizzi sono assegnati tramite DHCP. Poiché in questo ambiente non esiste una lista di binding affidabili pre-configurata, DARPI aggiunge una nozione di stato al protocollo ARP, tradizionalmente stateless. Questa funzionalità è ottenuta tracciando tutti i messaggi ARP Request in uscita in una cache interna temporanea. Un ARP Reply in entrata è considerato valido e affidabile solo se corrisponde a una richiesta pendente recentemente inviata dall'host locale. Se un ARP Reply non è sollecitato o non corrisponde a una richiesta registrata, esso viene classificato come anomalo e la sua associazione viene considerata maligna e scartata (Deny Policy), prevenendo l'avvelenamento della cache locale.
+
+        Il modulo HARPI (Hybrid ARP Inspection) combina infine le funzionalità di SARPI e DARPI, gestendo in modo diverso le associazioni statiche e quelle dinamiche all'interno della stessa rete.
+
+        Questa soluzione non è esente da difetti, in quanto presenta le stesse difficoltà di implementazione della precedente in reti eterogenee e con un alto ricambio degli host. Inoltre, è necessario disabilitare a livello di sistema operativo l'accettazione delle gratuitous Reply, ovvero le ARP Reply senza una ARP Request precedente. 
+
+        % \begin{figure}
+        %     \centering
+        %     \includegraphics[width=\textwidth, height=\textheight, keepaspectratio]{immagini/ArpON_DARPI_activity_diagram.jpeg}
+        %     \caption{ArpON DARPI activity diagram}
+        %     \label{fig:ArpON_DARPI_activity_diagram}
+        % \end{figure}
+
+        Queste modifiche al kernel sono invasive perché intervengono direttamente sul comportamento di rete del sistema operativo; possono essere pericolose se non gestite correttamente, causando potenziali interruzioni della rete. La stessa documentazione di ArpON avverte sui rischi di queste modifiche in caso di terminazione impropria:
+        
+        \emph{"Remember to restore the values of the arp\_ignore and arp\_accept kernel parameters of the specified network interface (the default values are 0 for both), if you have terminated the ArpON daemon with other signals, e.g. kill signal (SIGKILL)."}
+
+
+        \subsection{Arpwatch}
+
+        Arpwatch \cite{arpwatch} è uno strumento open source che fornisce una soluzione di monitoraggio passivo per la rilevazione di attacchi ARP Spoofing all'interno di una rete locale. A differenza di soluzioni attive come ArpON, Arpwatch opera come daemon di semplice ispezione e logging, intercettando i messaggi ARP nel traffico di rete e confrontandoli con un database locale di associazioni IP-MAC note.
+        
+        Il funzionamento di Arpwatch attua una strategia di vigilanza continua sul traffico ARP locale. Il daemon intercetta ogni pacchetto ARP che attraversa l'interfaccia di rete, osservando in particolare le risposte di tipo ARP Reply. Queste risposte includono un'associazione tra un indirizzo IP e un indirizzo MAC che rappresenta il nodo mittente.
+
+        Per ogni ARP Reply ricevuta, Arpwatch esegue un confronto con la sua cache interna, un database locale storico contenente i precedenti binding IP-MAC considerati affidabili. Quando l'associazione indicata nella risposta corrisponde a quanto già registrato, il pacchetto viene ignorato in quanto conforme al normale comportamento di rete.
+        
+        Tuttavia, se Arpwatch rileva un cambiamento inatteso, ovvero un indirizzo IP che si mappa su un indirizzo MAC differente da quello presente nella cache, interpreta tale evento come potenzialmente anomalo e sospetto. A questo punto viene generato un allarme, che può concretizzarsi nell'invio di una notifica via email agli amministratori, nella scrittura di un messaggio sul sistema di log o nell'attivazione di script di reazione personalizzati, consentendo un intervento tempestivo.
+        
+        In sintesi, Arpwatch monitora in modo passivo il traffico ARP, tenendo traccia dei binding IP-MAC e segnalando le modifiche potenzialmente indicative di un ARP spoofing o di un attacco Man-in-the-Middle. Questa metodologia permette di rilevare efficacemente comportamenti anomali, pur non fornendo un meccanismo di blocco attivo degli attacchi.
+        
+        Arpwatch presenta significativi limiti che ne riducono l'efficacia come soluzione di sicurezza attiva. In primo luogo, è una soluzione puramente passiva: non previene gli attacchi, ma si limita a rilevarli e a segnalarli. In secondo luogo, in ambienti dinamici come le reti DHCP, dove gli indirizzi IP vengono frequentemente riassegnati, Arpwatch genera numerosi falsi positivi, creando un carico amministrativo considerevole. Inoltre, il suo funzionamento dipende esclusivamente dalla memorizzazione di binding già noti, il che la rende vulnerabile a sofisticati attacchi che non modificano le associazioni già conosciute.
+        
+        La sua implementazione rimane semplice e leggera, richiedendo interventi minimali sulla rete; tuttavia, questo vantaggio è compensato dall'assenza di meccanismi di risposta automatica e dall'incapacità di prevenire attivamente i danni derivanti da ARP Poisoning. Arpwatch è quindi più adatto a contesti in cui il monitoraggio e l'analisi forense post-attacco sono prioritari rispetto alla prevenzione in tempo reale.
+
+        \subsection{Static ARP Table}
+
+        Le tabelle ARP statiche rappresentano una soluzione semplice e storicamente riconosciuta per contrastare gli attacchi di ARP Poisoning. Questa tecnica prevede la configurazione manuale e preventiva della mappatura fissa tra indirizzi IP e indirizzi MAC su ciascun dispositivo della rete, impedendo così la possibilità di alterare queste associazioni tramite pacchetti ARP falsificati.
+        
+        Dal punto di vista tecnico, l'implementazione di tabelle statiche significa che ogni nodo tiene in memoria una lista esplicita di binding IP-MAC, e rifiuta aggiornamenti dinamici o modifiche non autorizzate. In questo modo, i pacchetti ARP Reply che presentano associazioni differenti rispetto a quelle fissate manualmente vengono ignorati, proteggendo efficacemente contro i tentativi di avvelenamento della cache ARP.
+        
+        Tuttavia, questa soluzione presenta importanti limiti pratici che ne riducono notevolmente l’applicabilità nelle reti moderne:
+        
+        \begin{itemize}
+            \item \textbf{Scarsa scalabilità}: la configurazione deve essere eseguita manualmente su ciascun host della rete, comportando un elevato overhead amministrativo e la possibilità di errori.
+            \item \textbf{Incompatibilità con reti dinamiche}: in ambienti dove gli indirizzi IP vengono assegnati dinamicamente, come le reti DHCP, la gestione delle tabelle statiche diventa impraticabile e può causare problemi di connettività.
+            \item \textbf{Rigidità e complessità di manutenzione}: ogni variazione nella rete richiede una modifica manuale e coordinata delle tabelle, rendendo difficile la gestione in presenza di host mobili o reti in rapida evoluzione.
+        \end{itemize}
+        
+        Per questi motivi, l’uso delle tabelle ARP statiche è generalmente riservato a reti di piccole dimensioni o a contesti di laboratorio e test, dove le condizioni di rete sono controllate e stabili. Nelle implementazioni di sicurezza più avanzate e scalabili, si preferiscono soluzioni dinamiche e automatizzate che possano adattarsi alla complessità e variabilità delle reti reali.
+
+        \subsection{Gratuitous ARP Filtering}
+
+        Il filtraggio dei Gratuitous ARP rappresenta una tecnica di rafforzamento a livello di sistema operativo, utile per mitigare alcuni tipi di attacchi ARP Spoofing. I pacchetti Gratuitous ARP sono particolari messaggi ARP in cui un host annuncia il proprio indirizzo IP associato senza che sia stata precedentemente inviata una richiesta specifica. Sebbene questi messaggi servano normalmente a segnalare aggiornamenti o a prevenire conflitti IP, possono essere utilizzati in modo malevolo per manipolare le tabelle ARP degli host della rete.
+        
+        Il filtraggio dei Gratuitous ARP consiste nell’abilitare, tramite parametri del kernel dei sistemi operativi come Linux, regole di controllo che limitano o bloccano l’accettazione di questi messaggi quando sono considerati non necessari o sospetti. Questo aiuta a ridurre la superficie di attacco indiretta associata a pacchetti ARP inattesi o falsificati, diminuendo la probabilità di accettare risposte malevoli o di inserire binding non autorizzati nella cache ARP.
+        
+        Dal punto di vista tecnico, il filtro può essere configurato agendo sui parametri \texttt{arp\_\allowbreak ignore} e \texttt{arp\_\allowbreak accept} del kernel, impostandoli a valori che obblighino il sistema a rispondere o accettare pacchetti ARP solo in circostanze definite, ad esempio solo quando sono associati all’interfaccia corretta o alla configurazione IP attiva. Ciò migliora la robustezza del sistema contro alcune varianti di ARP Spoofing senza intervenire in modo massiccio sul traffico o sull’architettura di rete.
+        
+        Tuttavia, questa soluzione presenta alcune limitazioni \cite{trabelsi2010investigating}:
+        
+        \begin{itemize}
+            \item \textbf{Potenziali incompatibilità}: modifiche aggressive alle impostazioni di accettazione ARP possono causare problemi di connettività, in particolare in reti con configurazioni IP complesse o cambi frequenti di indirizzo.
+            \item \textbf{Falsa sensazione di sicurezza}: pur migliorando la resistenza contro gli attacchi basati su Gratuitous ARP, questa tecnica non protegge da tutte le varianti di ARP Poisoning, né da attacchi più sofisticati basati su risposte ARP regolari ma malevole.
+            \item \textbf{Richiede una gestione attenta}: la scelta e il tuning dei parametri kernel devono essere eseguiti con conoscenza e cautela per evitare effetti collaterali indesiderati.
+        \end{itemize}
+        
+        In definitiva, il filtraggio dei Gratuitous ARP costituisce un buon complemento di sicurezza a livello di sistema operativo, ma solo come parte di una strategia più ampia che include tecniche di monitoraggio e prevenzione più robuste per contrastare efficacemente gli attacchi ARP Spoofing.
+        
+    
+        
+    \section{Soluzioni Centralizzate}
+        
+
+        \subsection{SNORT - Intrusion Detection System (IDS)}
+        
+        Un Intrusion Detection System (IDS) è uno strumento progettato per monitorare il traffico di rete o le attività di sistema al fine di individuare comportamenti sospetti, anomalie o eventuali attacchi informatici. Gli IDS possono essere classificati in diverse tipologie, tra cui quelli basati sul riconoscimento di firme (o \emph{signature}) e quelli basati su comportamenti anomali.
+        
+        SNORT \cite{snort} è uno degli IDS open source più diffusi e affermati, capace di effettuare un'analisi approfondita dei pacchetti di rete in tempo reale. Attraverso un sistema di regole configurabili, SNORT è in grado di riconoscere i pattern corrispondenti a molteplici tipologie di attacco, incluse le varie forme di ARP Poisoning.
+        
+        Per quanto riguarda specificamente gli attacchi di ARP spoofing, SNORT monitora i pacchetti ARP Reply e può generare alert qualora rilevi risposte sospette, in particolare quando un ARP Reply non è preceduto da una richiesta ARP corrispondente o quando si individua una variazione anomala nelle associazioni IP-MAC. Questo consente agli amministratori di rete di essere tempestivamente informati di potenziali compromissioni o tentativi di Man-in-the-Middle.
+        
+        Nonostante l'efficacia nel rilevamento, SNORT è uno strumento limitato in questo contesto: non dispone infatti di meccanismi integrati per bloccare o mitigare attivamente gli attacchi segnalati, limitandosi invece a sollevare notifiche, le quali devono essere interpretate e gestite manualmente. Inoltre, la capacità di SNORT di identificare gli attacchi di ARP spoofing non è basata su una certezza assoluta, ma su un modello di allerta probabilistico, che si traduce in segnalazioni di eventi sospetti piuttosto che in conferme definitive di compromissione. 
+
+        Questa natura comporta che molti degli allarmi generati possano risultare falsi positivi, soprattutto in ambienti di rete complessi o dinamici, dove i cambiamenti naturali delle associazioni IP-MAC e il traffico legittimo possono attivare i meccanismi di rilevamento. L'inevitabile presenza di questi falsi positivi impone un oneroso lavoro di filtraggio e analisi postincidente da parte degli amministratori di rete, rallentando la capacità di risposta e riducendo l'efficacia pratica dello strumento nel contrastare attivamente gli attacchi. 
+        
+        In scenari operativi in cui la tempestività e la precisione sono fondamentali, questa caratteristica di SNORT costituisce una limitazione critica, sottolineando l'importanza di integrare sistemi IDS passivi con soluzioni di difesa attiva e prevenzione più robuste.        
+        In conclusione, SNORT rappresenta un  sistema di supporto per il monitoraggio e la diagnosi degli attacchi ARP valido soprattutto ai fini didattici \cite{damiani2010enseignement}, ma per garantire un'efficace protezione della rete, è necessario integrarlo con sistemi di monitoraggio e prevenzione più sofisticati.
+
+
+        \subsection{Port Security e Network Access Control (NAC)}
+
+        Le tecniche di Port Security rappresentano un approccio spesso adottato a livello di infrastruttura di rete, in particolare sugli Switch Managed \footnote{Vengono definiti "managed" quegli Switch che svolgono le normali funzionalità di livello 2 ma, in aggiunta, forniscono le funzionalità di routing e di gestione delle regole di instradamento, solitamente implementate solo dai router.}, per prevenire attacchi come l'ARP Spoofing, impedendo l’accesso di dispositivi non autorizzati o la falsificazione degli indirizzi MAC.
+        
+        Le tecniche di Port Security e di Network Access Control (NAC) sono due metodologie complementari utilizzate a livello di infrastruttura di rete, principalmente negli switch gestiti, per prevenire accessi non autorizzati e attacchi come l’ARP Spoofing.
+
+        La Port Security consente di associare uno o più indirizzi MAC specifici a una porta fisica dello switch, garantendo che solo i dispositivi con tali indirizzi possano comunicare attraverso quella porta. Se un dispositivo tenta di utilizzare un indirizzo MAC differente o non autorizzato, l’accesso viene bloccato o limitato in conformità alle policy configurate. Questo meccanismo riduce drasticamente la possibilità per un attaccante di compromettere la rete mediante la falsificazione degli indirizzi MAC e, quindi, di realizzare attacchi di MAC spoofing.
+        
+        Complementare a questo approccio è lo standard IEEE 802.1X \cite{ieee8021x}, che introduce un protocollo di autenticazione basato su un modello client-server. In questo schema, un dispositivo endpoint (supplicant) deve autenticarsi attraverso uno switch o access point abilitato (authenticator) presso un server di autenticazione prima di ottenere l’accesso alla rete. Solo gli endpoint che superano questa autentificazione possono comunicare nel dominio di rete, impedendo così l’ingresso di dispositivi non autorizzati o malevoli.
+        
+        L’adozione congiunta di Port Security e 802.1X contribuisce a ridurre significativamente la superficie di attacco della rete: limitando l’accesso fisico e logico esclusivamente a dispositivi autenticati e autorizzati, si prevengono efficacemente tentativi di ARP Spoofing provenienti da nodi non riconosciuti, rafforzando la sicurezza complessiva dell’infrastruttura di rete.
+        
+        Tuttavia, questi meccanismi presentano anch’essi alcune limitazioni:
+        
+        \begin{itemize}
+            \item \textbf{Dipendenza dall’hardware}: Port Security e NAC richiedono Switch Managed e infrastrutture di rete compatibili, aumentando i costi e la complessità dell’implementazione.
+            \item \textbf{Gestione delle eccezioni}: In ambienti dinamici o con dispositivi mobili, la configurazione statica degli indirizzi MAC o il processo di autenticazione possono generare problemi di connettività o richiedere frequenti interventi amministrativi.
+            \item \textbf{Non sempre efficaci contro attacchi interni}: Se un dispositivo malevolo è già autorizzato o autenticato, queste tecniche non prevengono gli attacchi provenienti da tale nodo.
+        \end{itemize}
+        
+        In definitiva, Port Security e Network Access Control rappresentano strategie robuste se integrate in un’articolata architettura di sicurezza di rete, ma non sono soluzioni complete né sufficienti da sole a prevenire ogni forma di ARP poisoning, rendendo necessaria la loro integrazione con meccanismi di rilevamento e prevenzione più sofisticati.
+
+        È importante sottolineare un limite cruciale: queste tecniche risultano inefficaci contro attacchi provenienti da dispositivi malevoli già autorizzati o autenticati \cite{hsiao2013security}. Nel momento in cui un nodo compromesso riesce a ottenere o ha già ottenuto l’accesso legittimo alla rete tramite l’autenticazione o la configurazione di Port Security, le difese a livello di accesso diventano praticamente inutili. Un attaccante in possesso di credenziali valide o di un dispositivo “manomesso” può così eseguire liberamente azioni dannose, incluso l’ARP Spoofing, aggirando questi sistemi di controllo. 
+        
+        Per questo motivo, sebbene Port Security e NAC rappresentino importanti barriere iniziali, è indispensabile adottare sistemi complementari di ispezione del traffico e verifica dinamica degli indirizzi IP-MAC, capaci di rilevare e mitigare attacchi provenienti da entità già presenti nella rete, garantendo così un livello di protezione più completo e resiliente.
+
+        
+
+        \subsection{Stateful IP-MAC Binding Monitoring}
+        
+        Un approccio centrale per la prevenzione degli attacchi di ARP Poisoning è la sorveglianza dinamica e contestuale degli abbinamenti fra indirizzi IP e MAC, nota come \emph{stateful IP-MAC binding monitoring}. Questa tecnica consiste nel monitorare in tempo reale le associazioni IP-MAC osservate nel traffico di rete, rilevando incoerenze o tentativi di modifica non autorizzati.
+        
+        A livello pratico, dispositivi di rete avanzati, come Switch Managed o controller software-defined network (SDN)\footnote{Vengono definite Reti "DNS" quelle infrastrutture che disaccoppiano il livello dei dispositivi di rete dal livello del software di gestione della rete. Questo permette di gestire e programmare l'intera rete come se fosse un unico sistema, configurare la rete dinamicamente tramite software e offrire una visione globale e programmabile dell'infrastruttura}, tengono traccia dello stato corrente delle corrispondenze IP-MAC, verificando ogni messaggio ARP in ingresso per validarne la correttezza rispetto ai binding già noti, aggiornati dinamicamente in locale tramite osservazione o mediante integrazione con i lease DHCP. Se viene rilevato un pacchetto ARP che introduce una modifica sospetta o non autorizzata, il dispositivo può bloccarlo o generare un allarme immediato.
+        
+        Questa soluzione combina i benefici del controllo centralizzato con la capacità di adattarsi ai cambiamenti di rete tipici di ambienti dinamici, garantendo un controllo più granulare e tempestivo rispetto a sistemi passivi o statici.
+        
+        Tuttavia, presenta alcune criticità significative:
+        \begin{itemize}
+            \item \textbf{Complessità di gestione}: richiede infrastrutture di rete avanzate e sistemi centralizzati capaci di integrare dati provenienti da più fonti (ad esempio DHCP, ARP, switch forwarding tables).
+            \item \textbf{Limitazioni in ambienti eterogenei}: in reti con dispositivi disparati o senza supporto per queste funzioni, l’efficacia della contromisura viene compromessa.
+            \item \textbf{Potenziali falsi positivi}: variazioni temporanee, come i movimenti degli host o le riassegnazioni rapide di indirizzi IP, possono innescare falsi allarmi.
+            \item \textbf{Non previene gli attacchi interni da sistemi compromessi}: se un dispositivo compromesso è già autorizzato, l’attacco può comunque propagarsi.
+        \end{itemize}
+        
+        In sintesi, lo stateful IP-MAC binding monitoring rappresenta un netto miglioramento rispetto alle soluzioni passive o statiche, fornendo un controllo dinamico e più affidabile delle associazioni ARP. Tuttavia, resta una soluzione che richiede la modifica degli apparati di rete e che non si integrerebbea pienamente nell'infrastruttura preesistente, comportando una soluzione ad hoc che difficilmente possa essere mantenuta e replicata in scalabilità.
+
+
+        
+        \subsection{Dynamic ARP Inspection}
+    
+        Dynamic ARP Inspection (DAI) \cite{cisco3850DAI} è una funzionalità di sicurezza integrata in molti switch di fascia enterprise (Tabella \ref{tab:dai-vendors}), progettata per prevenire attivamente gli attacchi di ARP Spoofing e garantire l'integrità delle tabelle ARP nelle reti locali.\cite{cisco3850DAI} 
+        DAI agisce monitorando e filtrando i pacchetti ARP ricevuti sulle interfacce di rete, verificando che ciascuno di essi sia conforme a binding validi basati su informazioni affidabili fornite, ad esempio, dal DHCP Snooping.
+
+        \begin{table}[htbp]
+            \centering
+            \begin{tabular}{|>{\raggedright\arraybackslash}p{2cm}|>{\raggedright\arraybackslash}p{6,4cm}|>{\raggedright\arraybackslash}p{5,5cm}|}
+                \hline
+                \textbf{Fornitore} & \textbf{Linea Prodotti / Piattaforme che supportano DAI} & \textbf{Descrizione} \\
+                
+                \hline
+                Cisco & Catalyst series (e.g., 9200, 9300, 9400, 9500, 3850, 4500, 6500), Nexus (limited), Meraki MS series & Il produttore a cui si attribuisce l'invenzione della Dynamic ARP Inpection \\
+                
+                \hline
+                Juniper Networks & EX Series (e.g., EX2300, EX3400, EX4300, EX4600, QFX with Junos ELS) & Viene sempre riconosciuta con Dynamic ARP Inspection\\
+                
+                \hline
+                HPE Aruba & Aruba CX series (6200, 6300, 6400, 8100, 8300, 8400, 10000), 2930F/3810/5400R & CX: Dynamic ARP Inspection; Older ProVision: Dynamic ARP Protection (simile) \\
+                \hline
+                
+                Fortinet & FortiSwitch series (e.g., FS-108E, FS-448E, FS-1000+ models) & Dynamic ARP Inspection; integrata in FortiGate \\
+                \hline
+                
+                Huawei & CloudEngine S-series, NE-series, S5700, S6700, CloudEngine 6800/8800 & Supportata come DAI o ARP strict inspection \\
+                \hline
+                
+                NETGEAR & M4300, M4350, some Insight-managed models & Disponibile sui dispositivi managed di alta gamma \\
+                \hline
+            \end{tabular}
+            \label{tab:dai-vendors}
+            \caption{Fornitori di switch enterprise che supportano Dynamic ARP Inspection (DAI)}
+        \end{table}
+        
+        Il DHCP Snooping è un meccanismo di sicurezza complementare che filtra e controlla i messaggi DHCP in una rete, solitamente eseguito direttamente sugli switch di accesso o sugli switch di livello distribuzione. Durante questo processo, lo switch crea e mantiene una tabella di binding dinamica e affidabile che associa gli indirizzi IP assegnati agli indirizzi MAC dei dispositivi client, insieme alle informazioni riguardanti le porte dello switch e la VLAN da cui provengono. Questa tabella, nota come binding table, risiede nella memoria dello switch stesso e funge da riferimento sicuro per DAI nella validazione dei pacchetti ARP che transitano attraverso le sue interfacce.
+        
+        DAI garantisce che solo i pacchetti ARP con associazioni IP-MAC, accertate e catalogate nella tabella definita in precedenza, vengano permessi, mentre i pacchetti sospetti o non autorizzati vengano bloccati immediatamente. Questa ispezione dinamica è basata su binding noti e consente di identificare e isolare tentativi di Man-in-the-Middle causati da manipolazioni fraudolente delle tabelle ARP, migliorando la sicurezza a livello 2.
+
+    \subsubsection{Funzionamento di Dynamic ARP Inspection}
+
+            Dynamic ARP Inspection (DAI) agisce in tempo reale controllando ogni pacchetto ARP in ingresso sulle porte configurate, avvalendosi di una tabella di binding affidabile, tipicamente creata dalla funzione di DHCP Snooping.
+            
+            La tabella delle associazioni IP-MAC è aggiornata dinamicamente ogni volta che un host ottiene un indirizzo IP tramite il protocollo DHCP: ogni lease DHCP aggiunge alla tabella una riga con l’indirizzo MAC del client, l’IP assegnato, la relativa interfaccia e il tempo di validità. La tabella funge da riferimento autorevole per tutte le successive operazioni di ispezione ARP.
+            
+            Le porte dello switch devono essere designate come \textit{trusted} o \textit{untrusted}:
+            \begin{itemize}
+                \item Porte \textbf{trusted} (uplink, router, server DHCP): i pacchetti ARP non sono soggetti a verifica DAI, riducendo impatti su funzioni critiche.
+                \item Porte \textbf{untrusted} (access toward end-hosts): DAI verifica rigorosamente ogni pacchetto.
+            \end{itemize}
+            Questa distinzione è fondamentale per minimizzare i falsi positivi e massimizzare la sicurezza perimetrale. La configurazione e la gestione delle interfacce devono essere mantenute aggiornate e coerenti con la topologia della rete.
+
+
+            Al ricevimento di un pacchetto ARP su una porta configurata per DAI, lo switch esegue una serie di verifiche:
+
+            \begin{itemize}
+                \item \textbf{Binding Validation}: il pacchetto ARP deve presentare un'associazione IP-MAC esattamente corrispondente a una voce valida in tabella. Se l’indirizzo IP o MAC non corrisponde, il pacchetto viene scartato e segnalato.
+                \item \textbf{Rate Limiting}: DAI applica limitazioni sul numero di pacchetti ARP accettati in un intervallo di tempo, mitigando attacchi di flood (ARP DoS).
+                \item \textbf{Ingress Port Check}: solo i pacchetti provenienti dalle interfacce non fidate (\texttt{untru} \texttt{-sted}) sono sottoposti a controllo. Sulle interfacce \textit{trusted} (tipicamente collegate a router, server DHCP, collegamenti du trunk), il traffico ARP passa senza verifica, riducendo i falsi positivi.
+                \item \textbf{Policy Enforcement}: DAI permette di configurare politiche avanzate, come la gestione specifica dei Gratuitous ARP (blocco, passaggio condizionato), l’integrazione con logging di sicurezza, e la personalizzazione del livello di allerta o drop.
+                \item \textbf{Logging}: Ogni evento di drop o violazione è registrato nei log dello switch e può essere attivata una notifica all’amministratore di rete.
+            \end{itemize}
+
+            Alcuni dei passaggi chiave possono essere riassunti così:
+            
+            \begin{enumerate}
+                \item L'host ottiene l'IP tramite DHCP 
+                \item DHCP Snooping aggiunge il binding IP-MAC alla tabella.
+                \item Un host invia pacchetti ARP sulla VLAN protetta / rete monitorata
+                \item lo switch verifica l’associazione IP-MAC.                
+                \begin{enumerate}
+                    \item Se il binding è valido, il pacchetto ARP viene inoltrato. 
+                    \item Se il binding non è valido, procede al \texttt{DROP} del pacchetto ARP e \texttt{log} dell'attività sospetta.
+                \end{enumerate}
+                \item Rate limiting: accertata la validità di inoltro, se si supera la soglia configurata di pacchetti per secondo (pps), il DAI memorizza un log a riguardo e blocca la ricezione.
+            \end{enumerate}
+
+            \subsubsection{Punti di Forza}            
+
+            Grazie a questi meccanismi, DAI previene efficacemente attacchi Man-in-the-Middle (MITM) tramite ARP spoofing, poiché ogni tentativo di invio di ARP Reply falsificati da parte di dispositivi non autorizzati o con binding non validi viene bloccato prima di diffondersi nella rete. Inoltre, la sincronizzazione dinamica con DHCP Snooping garantisce che anche le reti dinamiche e in rapido cambiamento siano protette senza la necessità di configurazioni statiche onerose.
+            
+            DAI consente un'ispezione ARP capillare, un adattamento dinamico alle variazioni di rete, e la mitigazione degli attacchi DoS basati su ARP, risultando compatibile con ambienti enterprise complessi grazie all’integrazione con altre funzionalità Cisco e alla centralizzazione della logica di sicurezza. La sua granularità, configurabilità e capacità di risposta immediata lo rendono una soluzione di riferimento ben oltre gli strumenti passivi e i controlli statici.
+            
+            Tra i principali vantaggi di DAI si annoverano:
+            
+            \begin{itemize}
+                \item \textbf{Protezione proattiva}: DAI interviene in tempo reale bloccando i pacchetti ARP sospetti, prevenendo la compromissione delle tabelle ARP e l’efficacia degli attacchi.
+                
+                \item \textbf{Integrazione con meccanismi esistenti}: sfruttando le informazioni di DHCP Snooping e Port Security, DAI utilizza una base dati affidabile e aggiornata per la validazione, assicurando coerenza e riduzione di falsi positivi.
+                
+                \item \textbf{Scalabilità}: grazie all’automazione nella gestione dei binding e alla configurazione dinamica delle interfacce trusted e untrusted, DAI può essere efficacemente implementato anche in reti di grandi dimensioni e in ambienti enterprise complessi.
+                
+                \item \textbf{Riduzione del carico amministrativo}: eliminando la necessità di configurazioni manuali statiche e grazie a un report di log più controllato, DAI semplifica la manutenzione e riduce il rischio di errori umani.
+                
+                \item \textbf{Compatibilità con ambienti dinamici}: DAI si adatta automaticamente ai cambi frequenti di indirizzi IP attraverso la collaborazione con DHCP Snooping, mantenendo la protezione senza interruzioni.
+                
+                \item \textbf{Supporto agli standard di rete}: essendo una soluzione standardizzata da Cisco ed adottata dai principali fornitori (Tabella \ref{tab:dai-vendors}), DAI beneficia di un ampio supporto e di una documentazione consolidata.
+            \end{itemize}
+            
+            Questi punti di forza rendono Dynamic ARP Inspection la soluzione di riferimento nei contesti aziendali per la protezione contro gli attacchi ARP Poisoning e l’efficace salvaguardia delle infrastrutture di rete a livello di layer 2.
+
+      
+    \section{Conclusioni sulle Soluzioni Presenti in Letteratura}
+    
+    Le soluzioni di sicurezza di tipo \textit{host-based}, come ArpON e Arpwatch analizzate nella precedente sezione, offrono un approccio distribuito alla protezione contro gli attacchi di ARP spoofing, installando un software di controllo direttamente su ciascun dispositivo della rete. Questa tecnica, pur garantendo un controllo granulare e localizzato, presenta tuttavia diversi svantaggi.
+    
+    In primo luogo, la presenzae di daemon di sicurezza su tutti i nodi comporta un aumento proporzionale della superficie di attacco complessiva del sistema, in quanto ogni dispositivo diventa un potenziale punto vulnerabile che può essere compromesso o disabilitato. Come formalizzato in \textit{un'Attack Surface Metric} da Manadhata e Wing \cite{Manadhata_2008}, una maggiore superficie di attacco implica un rischio maggiore di successo per gli aggressori.
+    
+    Inoltre, le soluzioni host-based spesso richiedono una complessa gestione distribuita, che può risultare onerosa in reti di grandi dimensioni o eterogenee, con elevati costi in termini di manutenzione, aggiornamento e sincronizzazione. Alcuni strumenti, come Arpwatch, si limitano a monitorare e segnalare anomalie senza fornire un meccanismo di prevenzione attiva, lasciando ampi margini di intervento manuale e reattivo.
+    
+    Infine, le soluzioni host-based risultano tipicamente meno efficaci nei confronti di attacchi che coinvolgono nodi già compromessi o nella gestione di situazioni di mobilità e dinamicità degli indirizzi IP nella rete, condizioni sempre più frequenti negli ambienti moderni.
+    
+    Per questi motivi, benché contribuiscano ad aumentare lo stato di allerta e la consapevolezza sugli attacchi, questo tipo di soluzioni presenta limiti evidenti che ne riducono l'efficacia e l'adattabilità in contesti complessi. Questo conduce naturalmente a preferire soluzioni con un'architettura centralizzata, capaci di garantire una riduzione della superficie di attacco complessiva attraverso una gestione più coesa, integrata e controllata della sicurezza di rete.
+
+    Passiamo ora ad analizzare le soluzioni centralizzate per la difesa contro gli attacchi ARP, con l’obiettivo di individuare quella più efficace e praticabile. Per questa analisi, si farà riferimento alla letteratura e in particolare allo studio \textit{An Analysis on the Schemes for Detecting and Preventing ARP Cache Poisoning Attacks} \cite{ieee4279062}, che offre una visione approfondita e critica di vari schemi di protezione esistenti nel panorama attuale.
+    
+    Considereremo inoltre un tema non ancora trattato, ovvero i costi di questa soluzione.
+    
+    Nel capitolo 4, “Comparison of Existing Schemes” \cite{ieee4279062}, gli autori sottolineano che: \emph{“Out of all these schemes, we believe that the Dynamic ARP Inspection (DAI) mechanism [8] is the best because it is non-intrusive, requires no changes on the network hosts, and does not slow down ARP. Unfortunately, the high costs of the switches with DAI available makes this solution prohibitive for many companies”.}
+    Questa affermazione mette in evidenza il ruolo di DAI come soluzione di riferimento, in virtù della sua efficacia e della sua non invasività. Viene anche presentato il principale svantaggio di questa soluzione, ovvero il suo contesto di appartenenza: dispositivi enterprise con costi tendenzialmente troppo elevati per molte realtà. 
+    
+    Tale svantaggio ci fornisce uno spunto importante, già preso in considerazione  nel capitolo 3, “Schemes for Securing ARP” \cite{ieee4279062}. Nella Sezione 3.3, “Preventing or Blocking ARP Attacks”, gli autori osservano: \emph{“Some high-end Cisco switches have a new feature called Dynamic ARP Inspection. One main disadvantage of this solution is the high cost of switches that have this feature available”}. Questa asserzione indics  DAI come una tecnologia di fascia alta, riservata a reti con budget proporzionalmente adeguati.
+
+    Il principale aspetto negativo porta, infine, ad una conclusione chiara. Nel capitolo 6, “Future Work” \cite{ieee4279062}, discutendo i possibili sviluppi futuri, gli autori anticipano: \emph{“We are working in a new scheme to secure ARP that complies with the requirements listed in Section 5. Our pre-liminary design adapts some ideas of Cisco’s Dynamic ARP Inspection [8] in such a way that does not require the use of costly switches, as DAI does”.} Questo conferma  DAI come soluzione ideale e suggerisce la possibilità di una sua realizzazione in un contesto più fruibile. Idealmente, senza il contesto enterprise di alta gamma che la circonda, gli autori lasciano intendere che DAI potrebbe essere una funzionalità integrabile anche in dispositivi economici.
+    
+    \section{L'idea di una Dynamic ARP Inspection più fruibile}
+
+    Secondo quanto discusso nella sezione precedente, la funzionalità "Dynamic ARP Inspection" merita un'implementazione meno costosa ma senza perdite di efficacia sia in termini di sicurezza che di prestazioni. L'oggetto di questo elaborato di tesi è la realizzazione di questa idea: un DAI sviluppato con l'obiettivo di superare le limitazioni dell'ambito enterprise in cui è stato confinato fino ad ora. Si tratta di una funzione integrabile in un ampia gamma di dispositivi di rete, distribuendo questo potente controllo di socurezza per il bene di tutti gli utenti, ed aumentando la sicurezza di molte realtà aziendali e private, 
+    
+    La scelta della modalità di sviluppo ricade sul paradigma fruibile per definizione, ovvero l'Open Source. Questo paradigma verrà approfondito nel capitolo seguente per una comprensione ottimale. 
+
+    In sintesi, l'elaborato si pone come obiettivo quello di sfidare l'attuale frontiera tecnologica riguardo alla sicurezza negli attacchi di ARP Cache Poisoning presentando uno spunto di riposizionamento delle soluzioni attuali. Ciò avviene tramite la realizzazione di un software di Dynamic ARP Inspection "leggero" che possa essere considerato il punto di partenza per un'integrazione sistematica in dispositivi di rete di natura completamente eterogenea, senza limiti di natura implementativa e/o economica, restituendo agli utenti la sicurezza dei propri apparati di rete.

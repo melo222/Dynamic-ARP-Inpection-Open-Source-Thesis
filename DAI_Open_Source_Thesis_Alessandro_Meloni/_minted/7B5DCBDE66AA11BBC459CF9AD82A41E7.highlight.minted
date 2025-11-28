@@ -1,0 +1,9 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+        iptables \PYGZhy{}t nat \PYGZhy{}A POSTROUTING \PYGZhy{}o enp0s3 \PYGZhy{}j MASQUERADE
+
+        iptables \PYGZhy{}A FORWARD \PYGZhy{}i enp0s8 \PYGZhy{}o enp0s3 \PYGZhy{}j ACCEPT
+        iptables \PYGZhy{}A FORWARD \PYGZhy{}i enp0s9 \PYGZhy{}o enp0s3 \PYGZhy{}j ACCEPT
+
+        iptables \PYGZhy{}A FORWARD \PYGZhy{}i enp0s8 \PYGZhy{}o enp0s9 \PYGZhy{}j ACCEPT
+        iptables \PYGZhy{}A FORWARD \PYGZhy{}i enp0s9 \PYGZhy{}o enp0s8 \PYGZhy{}j ACCEPT
+\end{MintedVerbatim}

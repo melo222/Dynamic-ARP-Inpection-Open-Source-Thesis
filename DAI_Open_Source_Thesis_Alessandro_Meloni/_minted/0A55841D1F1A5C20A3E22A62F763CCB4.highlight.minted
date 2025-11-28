@@ -1,0 +1,4 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+            \PYGZsh{} NAT per accesso Internet dagli host interni
+            iptables \PYGZhy{}t nat \PYGZhy{}A POSTROUTING \PYGZhy{}o enp0s3 \PYGZhy{}j MASQUERADE
+\end{MintedVerbatim}

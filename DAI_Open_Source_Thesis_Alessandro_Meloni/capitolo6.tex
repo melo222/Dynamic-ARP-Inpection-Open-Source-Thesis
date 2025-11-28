@@ -1,0 +1,498 @@
+\chapter{Testing ed Evidenze}
+    % \section{Prerequisiti e assunzioni}
+        
+    \section{Criteri ed Obbiettivi}
+
+    La validazione di un sistema di sicurezza di rete come il \textit{Dynamic ARP Inspection} (DAI) non può limitarsi alla sola verifica funzionale della correttezza logica (i.e., il blocco di un pacchetto malevolo), ma deve necessariamente includere un'analisi quantitativa delle prestazioni. Essendo il DAI un componente che opera in linea sul traffico di rete a Livello 2, qualsiasi inefficienza nel codice si tradurrebbe in latenza per l'utente finale o, nel caso peggiore, in perdita di pacchetti legittimi (packet loss) e interruzione del servizio.
+    
+    Per valutare l'efficacia e l'efficienza della soluzione Open Source proposta, sono state definite quattro metriche fondamentali. Queste misurazioni ci permettono di quantificare il comportamento del sistema sotto diversi profili di carico e di confrontare oggettivamente le diverse configurazioni architetturali (Single-Thread vs Multi-Thread).
+    
+    Di seguito vengono formalizzate le metriche utilizzate e il loro significato nel contesto del progetto.
+    
+        \subsection{Latenza di Elaborazione (Processing Latency)}
+        La latenza di elaborazione, misurata in microsecondi ($\mu s$), rappresenta l'intervallo di tempo che intercorre tra l'istante in cui un pacchetto ARP viene catturato dal thread ricevitore e l'istante in cui il sistema emette un verdetto (legittimo o malevolo) al termine dell'analisi.
+        
+        Formalmente, per ogni pacchetto $p$, la latenza $L_p$ è calcolata come:
+        \[ L_p = T_{out} - T_{in} \]
+        dove $T_{in}$ è il timestamp acquisito tramite \textit{Monotonic Clock} al momento dell'inserimento nella coda condivisa (enqueue), e $T_{out}$ è il timestamp acquisito al termine della funzione di validazione.
+        
+        \textbf{Significato nel contesto:} Questa metrica è il principale indicatore della reattività del sistema ("Real-Time"). Poiché il protocollo ARP è bloccante per la comunicazione IP successiva, un valore elevato di latenza introdurrebbe ritardi nell'instaurazione delle connessioni di rete. L'obiettivo è minimizzare $L_p$ affinché l'ispezione risulti trasparente all'utente. Nei grafici successivi, analizzeremo sia la latenza media che i picchi di latenza per valutare la stabilità sotto stress.
+        
+        \subsection{Throughput Sostenibile (Packets Per Second - PPS)}
+        Il Throughput indica la capacità del sistema di processare una data mole di traffico nell'unità di tempo. Viene misurato in Pacchetti Per Secondo (PPS).
+        
+        Questa metrica viene calcolata dal modulo di monitoraggio campionando il numero di pacchetti processati $\Delta N$ in un intervallo di tempo $\Delta t$:
+        \[ PPS = \frac{\Delta N}{\Delta t} \]
+        
+        \textbf{Significato nel contesto:} Questa metrica misura la "potenza bruta" del motore di ispezione ed è fondamentale per valutare la scalabilità. Durante un attacco di tipo \textit{ARP Flood} o in presenza di picchi di traffico broadcast legittimo (es. tempeste di broadcast), il sistema deve essere in grado di sostenere un throughput elevato senza collassare. I test di carico mirano a individuare il punto di saturazione del sistema, ovvero il numero massimo di PPS gestibili prima che si verifichi un degrado delle prestazioni.
+        
+        \subsection{Occupazione della Coda (Queue Load Saturation)}
+        Questa metrica percentuale misura il livello di riempimento del buffer circolare condiviso tra il thread produttore (Receiver) e i thread consumatori (Analyzers).
+        Dato che il campionamento periodico potrebbe non catturare picchi istantanei di riempimento, il software è stato strumentato per registrare il \textbf{Picco di Occupazione} (\textit{Peak Queue Load}) raggiunto nell'intervallo di campionamento.
+        
+        \[ Q_{\%} = \left( \frac{Count_{max}}{Size_{queue}} \right) \times 100 \]
+        
+        \textbf{Significato nel contesto:} Questa è la metrica diagnostica principale per identificare i "colli di bottiglia" nell'architettura Produttore-Consumatore.
+        \begin{itemize}
+        \item Un valore vicino allo \textbf{0\%} indica che i consumatori sono più veloci del produttore: la coda viene smaltita istantaneamente (situazione ideale).
+        \item Un valore del \textbf{100\%} indica saturazione: i consumatori non riescono a smaltire il carico, la coda si riempie e il produttore viene bloccato, causando potenziale perdita di pacchetti di rete a livello di kernel.
+        \end{itemize}
+        L'analisi di questa metrica sarà determinante per dimostrare i vantaggi del passaggio da un'architettura Single-Thread a una Multi-Thread.
+        
+        \subsection{Accuratezza del Rilevamento (Detection Rate)}
+        Rappresenta la capacità funzionale del sistema di distinguere correttamente tra traffico lecito e illecito. Viene misurata confrontando il numero di attacchi iniettati durante la simulazione con il numero di alert registrati dal sistema nel contatore \texttt{AttacksTotal}.
+        
+        \textbf{Significato nel contesto:} Oltre alle prestazioni velocistiche, è imperativo che il sistema garantisca la sicurezza. In scenari di stress (es. Denial of Service), è cruciale verificare che il sistema non vada in "fail-open" (lasciando passare attacchi) né scarti traffico legittimo a causa del sovraccarico. Questa metrica confermerà la robustezza della logica di validazione anche in condizioni critiche.
+    
+        
+
+    \section{Strumentazione Integrata nel Software per il Testing}
+
+    Per ottenere le metriche definite nella sezione 6.1 senza alterare significativamente le prestazioni del sistema (riducendo al minimo l'effetto osservatore), è stato necessario "attrezzare" il codice sorgente.
+    L'approccio adottato consiste nell'introduzione di strumenti di misurazione a basso livello e nell'implementazione di un thread dedicato esclusivamente alla raccolta e alla persistenza dei dati statistici su file CSV. Viene prediletto tale formato di file per la raccolta di dati in un formato facilmente integrabile in diagrammi e infografica.
+    
+    Di seguito vengono descritti i moduli implementativi introdotti per il testing.
+        
+        \subsection{Estensione delle Strutture Dati}
+        Il primo passo ha riguardato l'estensione delle strutture dati fondamentali definite in \texttt{arp\_queue.h}.
+        È stato introdotto un campo \texttt{reception\_time} all'interno della struttura del pacchetto ARP per tracciare l'istante esatto di ingresso nel sistema. Inoltre, è stata definita una struttura \texttt{dai\_metrics\_t} per aggregare i contatori globali in modo thread-safe e aggiunto un campo \texttt{peak\_count} alla coda per rilevare i picchi di utilizzo istantanei che sfuggirebbero a un semplice campionamento periodico.
+        
+        \begin{minted}[
+                    frame=lines,
+                    framesep=1mm,
+                    baselinestretch=1,
+                    bgcolor=codebg,
+                    fontsize=\footnotesize,
+                    % linenos
+                ]{c}
+        // Estensione della struttura pacchetto con timestamp
+        typedef struct {
+            unsigned char mac_addr[ETH_ALEN];
+            struct in_addr ip_addr;
+            unsigned char mac_addr_sender[ETH_ALEN];
+            struct timespec reception_time; // Timestamp (CLOCK_MONOTONIC)
+        } arp_association_t;
+        
+        // Struttura per le metriche globali condivise
+        typedef struct {
+            unsigned long total_processed;  // Totale pacchetti analizzati
+            unsigned long attacks_detected; // Totale attacchi rilevati
+            double total_latency_accum;     // Accumulatore latenza (per calcolo media)
+            pthread_mutex_t mutex;          // Mutex per accesso concorrente
+        } dai_metrics_t;
+        
+        // Aggiunta del Peak Meter nella Coda
+        typedef struct {
+            // ... altri campi (buffer, head, tail) ...
+            int count;      // Elementi attuali
+            int peak_count; // Massimo picco raggiunto nell'intervallo
+            // ... mutex e condition variables ...
+        } arp_association_queue_t;
+        \end{minted}
+        
+        \subsection{Misurazione della Latenza e Peak Detection}
+        Per calcolare la latenza di elaborazione ($L_p$), il modulo \texttt{receiver.c} è stato modificato per acquisire il timestamp tramite \texttt{clock\_gettime(CLOCK\_MONOTONIC)} immediatamente prima dell'inserimento in coda. L'uso del clock monotonico è essenziale per garantire la precisione indipendentemente da eventuali cambi dell'orario di sistema.
+        
+        Parallelamente, nel modulo \texttt{queue.c}, è stata implementata la logica di \textit{Peak Hold} all'interno della funzione di enqueue. Ogni volta che un pacchetto viene inserito, si verifica se il riempimento attuale supera il massimo registrato.
+        
+        \begin{minted}[
+                    frame=lines,
+                    framesep=1mm,
+                    baselinestretch=1,
+                    bgcolor=codebg,
+                    fontsize=\footnotesize,
+                    % linenos
+                ]{c}
+        // In queue.c - Logica Peak Hold durante l'enqueue
+        queue->count++;
+        
+        // Se il conteggio attuale supera il picco storico dell'intervallo, aggiorniamo
+        if (queue->count > queue->peak_count) {
+            queue->peak_count = queue->count;
+        }
+        \end{minted}
+        
+        Nel modulo \texttt{analyzer.c}, al termine della validazione, viene acquisito il timestamp finale e calcolata la differenza.
+        
+        \begin{minted}[
+                    frame=lines,
+                    framesep=1mm,
+                    baselinestretch=1,
+                    bgcolor=codebg,
+                    fontsize=\footnotesize,
+                    % linenos
+                ]{c}
+        // In analyzer.c - Calcolo Latenza
+        struct timespec end_time;
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        double latency_us = time_diff_micros(association->reception_time, end_time);
+        
+        // Aggiornamento atomico delle metriche globali
+        pthread_mutex_lock(&metrics->mutex);
+        metrics->total_processed++;
+        metrics->total_latency_accum += latency_us;
+        if (!is_valid) {
+            metrics->attacks_detected++;
+        }
+        pthread_mutex_unlock(&metrics->mutex);
+        \end{minted}
+        
+        \subsection{Modulo di Monitoraggio e Logging (Monitor Thread)}
+        Per garantire che l'attività di misurazione non rallentasse il processo critico di ispezione (come evidenziato dai test preliminari sull'impatto dell'I/O), è stato implementato un nuovo modulo \texttt{monitor\_t.c}.
+        Questo thread opera in modo asincrono rispetto al flusso dei pacchetti: si risveglia a intervalli regolari di 0.1 secondi (100ms), preleva un'istantanea atomica dei contatori e del picco della coda, calcola i delta (PPS e Latenza Media dell'intervallo) e scrive i risultati su un file CSV ottimizzato per la successiva analisi grafica.
+        
+        \begin{minted}[
+                    frame=lines,
+                    framesep=1mm,
+                    baselinestretch=1,
+                    bgcolor=codebg,
+                    fontsize=\footnotesize,
+                    % linenos
+                ]{c}
+        // In monitor_t.c - Loop principale
+        while(1) {
+            usleep(100000); // Campionamento a 10 Hz (0.1s)
+            
+            // ... lettura thread-safe delle metriche ...
+        
+            // Calcolo throughput istantaneo (Delta)
+            unsigned long delta_processed = current_processed - last_processed;
+            
+            // Calcolo Latenza media dell'intervallo
+            double interval_avg_latency = 0.0;
+            if (delta_processed > 0) {
+                 interval_avg_latency = delta_latency_sum / (double)delta_processed; 
+            }
+        
+            // Lettura e Reset del Picco Coda
+            pthread_mutex_lock(&m_args->queue->mutex);
+            int peak_q = m_args->queue->peak_count; 
+            m_args->queue->peak_count = 0; // Reset per il prossimo intervallo
+            pthread_mutex_unlock(&m_args->queue->mutex);
+            
+            // Persistenza su CSV
+            fprintf(m_args->csv_file, "%.1f,%lu,%.2f,%.2f,%lu\n", 
+                    time_elapsed, delta_processed, peak_queue_load, 
+                    interval_avg_latency, current_attacks);
+        }
+        \end{minted}
+        
+        Questa architettura di testing disaccoppiata ha permesso di raccogliere dati ad alta risoluzione temporale (10 campioni al secondo) anche sotto carichi di stress estremo (es. Denial of Service), garantendo la veridicità delle evidenze presentate nelle sezioni successive.
+
+    \section{Piani di Testing e Scenari}
+
+    La validazione sperimentale è stata progettata seguendo un approccio incrementale, volto a isolare le singole variabili che influenzano le prestazioni del sistema: l'architettura di elaborazione (Single vs Multi-thread), la natura del traffico (Legittimo vs Malevolo) e la complessità topologica (LAN Singola vs Multi-LAN).
+    
+    L'obiettivo è dimostrare empiricamente come la soluzione proposta scali all'aumentare del carico e come le scelte architetturali impattino sulla latenza e sulla resilienza del servizio.
+    
+        \subsection{Piano dei Test e Scenari}
+        
+        Per coprire le diverse casistiche operative, sono stati definiti tre gruppi principali di scenari, riassunti nella Tabella \ref{tab:test_scenarios}.
+        
+        Gli scenari sono stati concepiti per rispondere a specifici quesiti di ricerca:
+        \begin{itemize}
+            \item \textbf{Gruppo 1 (1.a/1.b):} Serve a stabilire la \textit{baseline} delle prestazioni. Utilizzando un solo thread, ci aspettiamo di evidenziare i limiti fisici dell'elaborazione sequenziale e il fenomeno della saturazione della coda.
+            \item \textbf{Gruppo 2 (2.a/2.b):} Introduce il parallelismo. Confrontando questi risultati con il Gruppo 1, si mira a quantificare il guadagno prestazionale (speedup) e la riduzione della latenza garantita dall'architettura Produttore-Consumatore.
+            \item \textbf{Gruppo 3 (3.a/3.b/3.c):} Simula un ambiente reale e ostile. Qui si valuta la capacità del sistema di gestire interfacce multiple e la sua resilienza (robustezza) quando una parte della rete è sotto attacco Denial of Service (DoS), verificando che il servizio sulle altre interfacce non venga interrotto.
+        \end{itemize}
+        
+        \begin{table}[H]
+            \centering
+                \begin{tabular}{|p{0.5cm}|p{3.5cm}|p{3.5cm}|p{5.5cm}|}
+                \hline
+                \textbf{ID} & \textbf{Configurazione} & \textbf{Traffico (Flood)} & \textbf{Obiettivo del Test} \\ \hline
+                \multicolumn{4}{|c|}{\textbf{Gruppo 1: Baseline Single-Thread}} \\ \hline
+                1.a & 1 Thread, 1 LAN & 50k Pkt Legittimi & Misurare il collo di bottiglia della CPU. \\ \hline
+                1.b & 1 Thread, 1 LAN & 50k Pkt Spoofed & Valutare l'overhead della logica di detection. \\ \hline
+                \multicolumn{4}{|c|}{\textbf{Gruppo 2: Scalabilità Multi-Thread}} \\ \hline
+                2.a & 4 Thread, 1 LAN & 50k Pkt Legittimi & Verificare la riduzione della latenza. \\ \hline
+                2.b & 4 Thread, 1 LAN & 50k Pkt Spoofed & Verificare la tenuta sotto stress di detection. \\ \hline
+                \multicolumn{4}{|c|}{\textbf{Gruppo 3: Complessità Multi-LAN (Concorrenza)}} \\ \hline
+                3.a & 4 Thread
+                
+                Multi-LAN & Rete 1: Legit 
+                
+                Rete 2: Attack & Test di isolamento del traffico misto. \\ \hline
+                3.b & 4 Thread
+                
+                Multi-LAN & Rete 1: Attack 
+                
+                Rete 2: Legit & \textit{DoS Resistance}: sopravvivenza traffico buono. \\ \hline
+                3.c & 4 Thread
+                
+                Multi-LAN & Rete 1: Attack
+                
+                Rete 2: Attack & \textit{Heavy Load}: Stress test massimo (100k pkt). \\ \hline
+                \end{tabular}
+            \caption{Tabella riassuntiva degli scenari di testing pianificati.}
+            \label{tab:test_scenarios}
+        \end{table}
+        
+        \subsection{Configurazione della Coda: Baseline e Tuning}
+        
+        Un aspetto cruciale di questa analisi riguarda il dimensionamento del buffer circolare (\texttt{ARP\_QUEUE\_SIZE}). Per valutare l'impatto della memoria sulle prestazioni, l'intera suite di test è stata eseguita in due configurazioni distinte:
+        
+        \begin{enumerate}
+            \item \textbf{Configurazione Standard (Queue Size = 1000):} Una dimensione contenuta, scelta per evidenziare rapidamente i fenomeni di saturazione e packet loss in condizioni di stress. Questa configurazione rappresenta un dispositivo con risorse di memoria limitate.
+            \item \textbf{Configurazione Ottimizzata (Queue Size = 10000):} Una dimensione maggiorata (10x), scelta per analizzare se un buffer più ampio possa mitigare i limiti di elaborazione del Single-Thread o se, al contrario, introduca solo latenza aggiuntiva (fenomeno noto come \textit{Bufferbloat}\footnote{Il \textit{Bufferbloat} è un fenomeno di congestione causato dall'eccessivo dimensionamento dei buffer nei dispositivi di rete. Quando il tasso di arrivo dei pacchetti supera la capacità di elaborazione, un buffer troppo ampio tende ad accumulare una grande quantità di dati in coda anziché scartare l'eccesso. Questo comportamento previene il packet loss immediato ma introduce una latenza elevata e variabile (jitter), degradando le prestazioni delle comunicazioni, specialmente quelle in tempo reale.}).
+        \end{enumerate}
+        
+        Nelle sezioni successive, verranno presentate le evidenze empiriche raccolte tramite la strumentazione software descritta in 6.2, mettendo a confronto le metriche di throughput, latenza e occupazione della coda per ogni scenario.
+
+    \section{Testing}
+
+    In questa sezione vengono presentati i risultati sperimentali ottenuti dall'esecuzione degli scenari pianificati. I dati esposti sono stati ricavati direttamente dai file di log in formato \texttt{CSV} generati dal modulo di monitoraggio interno (\texttt{monitor\_t}), garantendo un riscontro oggettivo basato su misurazioni ad alta frequenza (10 campioni al secondo). 
+    
+    Per ogni gruppo di test, verranno illustrati grafici che correlano il throughput di ingresso (PPS), l'occupazione della coda e la latenza di elaborazione, offrendo una visione completa del comportamento del sistema sotto stress. Negli scenari in cui è previsto un traffico malevolo, alle illustrazioni precedenti si aggiungerà quella dei pacchetti ricevuti e segnalati come malevoli.
+        
+    Per ciascuno scenario, verrà inoltre discussa l'efficacia del dimensionamento della coda (\texttt{QUEUE\_SIZE}), confrontando i risultati ottenuti con la dimensione standard (1000 slot) rispetto a quella maggiorata (10000 slot), al fine di valutare il trade-off tra utilizzo della memoria e latenza di accodamento.
+    
+
+            % ------- GRUPPO UNO ---------------------------------------------
+
+
+        \subsection{Rete LAN Singola (scenario 1.a/b)}
+
+        In questo primo gruppo di test, il router DAI è stato configurato con un singolo thread di analisi e una coda standard (\texttt{ARP\_QUEUE\_SIZE = 1000}). Questo scenario rappresenta la \textit{baseline} per comprendere i limiti intrinseci dell'elaborazione sequenziale.
+        
+
+            \subsubsection{Scenario 1.a: Traffico Legittimo (Baseline)}
+            Sottoponendo il sistema a un flood di traffico legittimo (50.000 pacchetti), i risultati (Figura \ref{fig:1a_legit}) evidenziano immediatamente un collo di bottiglia strutturale.
+
+            Come si evince dal grafico centrale (rosso), la coda raggiunge istantaneamente la saturazione (\textbf{100\%}) in corrispondenza di ogni ondata di traffico in ingresso. Questo comporta che il thread ricevitore venga bloccato, impedendo l'acquisizione di nuovi pacchetti dalla scheda di rete. La latenza media (grafico in basso) si attesta su valori elevati, con picchi fino a \textbf{4.6 ms}, confermando che i pacchetti trascorrono la maggior parte del tempo in attesa nel buffer.
+            
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/1a_legit.png}
+                \caption{Scenario 1.a: Saturazione della coda con singolo thread (Queue=1000).}
+                \label{fig:1a_legit}
+            \end{figure}            
+            
+
+            \subsubsection{Scenario 1.b: Traffico di Attacco e Impatto dell'I/O}
+            In questo test viene verificata la capacità del software nel rilevare gli attacchi. Inoltre, è emerso un aspetto critico riguardante l'impatto del logging sulle prestazioni \textit{Real-Time}.
+            
+            In una prima esecuzione, con il logging su console attivo per ogni alert, la latenza media è esplosa a oltre \textbf{1 secondo} (Figura \ref{fig:1b_print}), rendendo il sistema inutilizzabile.
+            
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/1b_print.png}
+                \caption{1.b: Impatto del Logging Sincrono (Latenza $>$ 500ms).}
+                \label{fig:1b_print}
+            \end{figure}
+            
+            Disabilitando l'output sincrono (Figura \ref{fig:1b_no_print}), la latenza è tornata a valori comparabili al traffico legittimo (\textbf{$\sim$1-4 ms}).
+            Tuttavia, anche in condizioni "ottimizzate", il singolo thread mantiene la coda costantemente al \textbf{100\%} di occupazione. Nonostante lo stress, il sistema ha dimostrato una corretta capacità di detection, rilevando tutti i 50.000 pacchetti malevoli senza falsi negativi, sebbene con un throughput limitato dalla saturazione.
+            
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/1b_no_print.png}
+                \caption{1.b: Prestazioni Pure senza Logging (Latenza $\sim$ 4ms).}
+                \label{fig:1b_no_print}
+            \end{figure}
+
+% ----------------- Dimensione Coda Maggiore --------------------            
+
+            \subsubsection{Scenario 1.a/b con Dimensione Coda Maggiore}
+            
+            Per verificare se il collo di bottiglia fosse dovuto esclusivamente alla scarsità di memoria, i test sono stati ripetuti aumentando la dimensione della coda a \textbf{10.000 slot} (10x).
+            
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/1a10.png}
+                \caption{Scenario 1.a (Coda 10k): Assorbimento dei burst senza saturazione.}
+                \label{fig:1a_10k}
+            \end{figure}
+            
+            I risultati (Figure \ref{fig:1a_10k} e \ref{fig:1b_10k}) mostrano un cambiamento radicale nella gestione della memoria:
+            \begin{itemize}
+                \item \textbf{Saturazione Eliminata:} Il picco di occupazione della coda è crollato dal 100\% a circa il \textbf{17.24\%}. Il buffer maggiorato è in grado di assorbire interamente le ondate di traffico (circa 1700 pacchetti) senza mai riempirsi completamente.
+                
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/1b10.png}
+                \caption{Scenario 1.b (Coda 10k): Detection sotto carico con buffer maggiorato.}
+                \label{fig:1b_10k}
+            \end{figure}
+            
+                \item \textbf{Fenomeno di \textit{Bufferbloat}:} Nonostante l'assenza di saturazione, la latenza di elaborazione non è migliorata, anzi, ha mostrato picchi fino a \textbf{6 ms}. Questo fenomeno conferma che aumentare la memoria impedisce la perdita di pacchetti all'ingresso (il Receiver non si blocca più), ma non velocizza l'elaborazione. I pacchetti si accumulano in una coda più lunga, aumentando il tempo di attesa medio prima di essere serviti dall'unico thread analizzatore disponibile.
+            \end{itemize}
+            
+            In conclusione, il tuning della coda risolve il problema del \textit{packet loss} ma non quello della latenza, che rimane vincolata alla capacità computazionale del singolo core.
+
+
+            % ------- GRUPPO DUE ---------------------------------------------
+
+
+        \subsection{Rete LAN Singola Multi-Thread (scenario 2.a/b)}
+
+        Il secondo gruppo di test segna il passaggio all'architettura parallela. Mantenendo invariato il carico di traffico (50.000 pacchetti), il router è stato configurato con un pool di \textbf{4 thread analizzatori} concorrenti. Questa configurazione mira a verificare se la parallelizzazione del processo di consumo possa eliminare il collo di bottiglia osservato in precedenza.
+
+            \subsubsection{Scenario 2.a: Traffico Legittimo con Elaborazione Parallela}
+            I risultati ottenuti (Figura \ref{fig:2a}) mostrano un comportamento radicalmente diverso rispetto allo scenario a singolo thread.
+
+            A fronte delle stesse ondate di traffico in ingresso, l'occupazione della coda (grafico rosso) rimane prossima allo \textbf{0,1\%}. I quattro thread lavorano in sinergia smaltendo i pacchetti quasi istantaneamente, impedendo l'accumulo nel buffer.
+            Il dato più significativo riguarda la latenza media (grafico viola), che crolla dai valori millimetrici del test precedente a circa \textbf{13-15 $\mu$s}. Si tratta di una riduzione di due ordini di grandezza (circa 100 volte più veloce), che rende il processo di ispezione trasparente e privo di impatti percepibili sulla rete.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/2a.png}
+                \caption{Scenario 2.a: Stabilità della latenza (~14 $\mu$s) grazie al multi-threading.}
+                \label{fig:2a}
+            \end{figure}
+
+
+            \subsubsection{Scenario 2.b: Resilienza all'Attacco sotto Stress}
+            Nello scenario di attacco (Figura \ref{fig:2b}), il sistema ha confermato la propria robustezza. Anche dovendo gestire la logica di aggiornamento dei contatori di sicurezza per 50.000 pacchetti malevoli, le prestazioni non hanno subito degrado.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/2b.png}
+                \caption{Scenario 2.b: Efficienza del rilevamento sotto attacco flood (4 Thread).}
+                \label{fig:2b}
+            \end{figure}
+
+            Il grafico evidenzia come la linea degli attacchi rilevati (verde) cresca linearmente e senza interruzioni fino al totale previsto, mentre la latenza rimane ancorata ai minimi di (\textbf{$\sim$6-7 $\mu$s}). L'assenza di saturazione della coda garantisce che nessun pacchetto venga scartato all'ingresso, assicurando una copertura di sicurezza del 100\% anche durante tentativi di \textit{Flooding Attack}.
+
+% ----------------- Dimensione Coda Maggiore --------------------
+
+            \subsubsection{Scenario 2.a/b con Dimensione Coda Maggiore}
+
+            Applicando la configurazione con coda maggiorata (10.000 slot) in un contesto multi-thread, si osserva un fenomeno interessante che contrasta con quanto visto nel caso a singolo thread.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/2a10.png}
+                \caption{Scenario 2.a (Coda 10k): Latenza stabile nonostante il buffer ampio.}
+                \label{fig:2a10}
+            \end{figure}
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/2b10.png}
+                \caption{Scenario 2.b (Coda 10k): Gestione ottimale dell'attacco con ampio margine di memoria.}
+                \label{fig:2b10}
+            \end{figure}
+
+            Come mostrato nelle Figure \ref{fig:2a10} e \ref{fig:2b10}, sebbene la capacità del buffer sia decuplicata, il picco di riempimento non supera mai il \textbf{9-17\%}.
+            A differenza dello scenario 1.a (dove la coda lunga causava latenze di 6 ms), qui la latenza media rimane eccellente (\textbf{$\sim$23 $\mu$s} per il traffico legittimo e addirittura \textbf{$\sim$6.5 $\mu$s} sotto attacco).
+
+            Ciò dimostra che, in un'architettura ben parallelizzata, l'aumento della memoria non introduce \textit{Bufferbloat}: i thread consumatori sono sufficientemente veloci da svuotare la coda prima che si crei un arretrato significativo. Di conseguenza, un buffer di grandi dimensioni in questo contesto agisce puramente come margine di sicurezza per ondate di traffico eccezionali, senza controindicazioni sulle prestazioni.
+
+
+
+            % ------- GRUPPO TRE ---------------------------------------------
+
+
+        \subsection{Rete Multi-LAN e Multi-Thread (scenario 3.a/b/c)}
+
+        L'ultimo gruppo di test introduce il livello di complessità più elevato, simulando un ambiente di rete reale in cui il router deve gestire contemporaneamente traffico proveniente da interfacce fisiche distinte (\texttt{enp0s8} e \texttt{enp0s9}). L'obiettivo è verificare la capacità del sistema di isolare i flussi di traffico e prevenire che un attacco su una sottorete comprometta il servizio sull'altra.
+
+            \subsubsection{Scenario 3.a: Isolamento del Traffico Misto}
+            In questo scenario, la Rete 1 è soggetta a un pesante carico di traffico legittimo (50k flood), mentre sulla Rete 2 viene iniettato un breve attacco mirato (1k pacchetti spoofed).
+
+            Il grafico in Figura \ref{fig:3a} dimostra la perfetta capacità di discriminazione del sistema. È possibile osservare come il throughput legittimo (linea blu) fluisca costantemente, mentre l'evento di attacco (visibile come un gradino netto nella linea verde degli attacchi rilevati) viene intercettato e bloccato istantaneamente.
+            Nonostante la contemporaneità degli eventi, la latenza media rimane contenuta entro i \textbf{19 $\mu$s}, confermando che l'attività malevola su un'interfaccia non degrada le prestazioni globali del router.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/3a.png}
+                \caption{Scenario 3.a: Gestione concorrente di traffico legittimo (Rete 1) e attacco (Rete 2).}
+                \label{fig:3a}
+            \end{figure}
+
+            \subsubsection{Scenario 3.b: Resistenza al Denial of Service (DoS)}
+            Questo test (Figura \ref{fig:3b}) rappresenta una prova critica di resilienza: la Rete 1 è sotto un massiccio attacco flood (50k pacchetti spoofed), mentre la Rete 2 tenta di inviare un piccolo volume di traffico legittimo (1k pacchetti).
+
+            L'evidenza chiave emerge dal confronto tra il totale dei pacchetti processati (linea nera) e gli attacchi rilevati (linea verde).
+            Sebbene la coda raggiunga momentaneamente la saturazione (\textbf{100\%}) a causa della violenza dell'attacco flood, il sistema non collassa. Al termine del test, il divario tra le due linee corrisponde esattamente ai \textbf{1.000 pacchetti legittimi} inviati.
+            Ciò dimostra che, anche in condizioni di saturazione parziale del buffer, l'architettura multi-thread è in grado di processare e salvare il traffico lecito, garantendo la continuità del servizio (\textit{Service Availability}) anche sotto assedio.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.9\textwidth]{immagini/testing_plot/3b.png}
+                \caption{Scenario 3.b: Survival del traffico legittimo durante un DoS massiccio.}
+                \label{fig:3b}
+            \end{figure}
+
+% ----------------- Dimensione Coda Maggiore --------------------
+
+            \subsubsection{Scenario 3.a e 3.b con Dimensione Coda Maggiore}
+
+            L'applicazione della coda maggiorata (10.000 slot) agli scenari Multi-LAN fornisce la conferma definitiva della validità del tuning.
+
+            Come evidenziato nella Figura \ref{fig:3b10}, nello scenario di resistenza al DoS, l'utilizzo della coda crolla dal 100\% (del test standard) a un mero \textbf{11.59\%}.
+
+            Ancora più sorprendente è il risultato dello stress test massimo (Figura \ref{fig:3c10}): anche con 100.000 pacchetti in ingresso simultaneo, il buffer non supera mai il \textbf{17.24\%} di occupazione.
+
+            Questo risultato sancisce che la configurazione \textbf{4 Thread + Coda 10k} rappresenta l'assetto ottimale per l'ambiente di produzione, capace di trasformare potenziali situazioni di disservizio (coda piena) in eventi di ordinaria gestione, mantenendo la latenza media sotto la soglia critica dei \textbf{10 $\mu$s} nella maggior parte degli scenari operativi.
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/3a10.png}
+                \caption{3.b (Coda 10k): DoS Resistance senza saturazione.}
+                \label{fig:3b10}
+            \end{figure}
+            
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/3b10.png}
+                \caption{3.c (Coda 10k): Heavy Load con coda al 17\%.}
+                \label{fig:3c10}
+            \end{figure}
+
+
+
+            \subsubsection{Scenario 3.c: Heavy Load Stress Test}
+            Lo scenario finale (Figura \ref{fig:3c}) sottopone il sistema al massimo stress teorico: un doppio attacco flood simultaneo su entrambe le reti, per un totale di \textbf{100.000 pacchetti} da analizzare nel minor tempo possibile.
+
+            Il sistema risponde con un throughput impressionante, raggiungendo picchi di \textbf{34.480 PPS}.
+
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=\textwidth]{immagini/testing_plot/3c.png}
+                \caption{Scenario 3.c: Throughput massimo (34k PPS) sotto carico estremo.}
+                \label{fig:3c}
+            \end{figure}
+
+            In questo contesto estremo, si osserva un fisiologico aumento della latenza media (\textbf{$\sim$270 $\mu$s}), imputabile alla contesa (\textit{lock contention}) tra i due thread ricevitori e i quattro analizzatori che accedono contemporaneamente alla coda condivisa. Tuttavia, il sistema mantiene la stabilità operativa, processando correttamente il 100\% del carico (50k attacchi bloccati e 50k pacchetti leciti inoltrati) senza perdite.
+
+
+    \section{Conclusioni sui Risultati Sperimentali}
+
+    L'ampia campagna di testing condotta ha permesso di caratterizzare il comportamento del sistema DAI Open Source sotto diversi profili di carico, evidenziando i limiti dell'approccio sequenziale e i benefici dell'architettura parallela.
+
+    Dall'analisi incrociata delle metriche di throughput, latenza e occupazione della coda, emergono tre evidenze fondamentali:
+
+    \begin{itemize}
+        \item \textbf{Il Limite del Single-Thread:} L'elaborazione su singolo thread si è dimostrata insufficiente per gestire ondate (\textit{burst}) di traffico ad alta intensità. In tutti gli scenari di stress (1.a/1.b), la coda ha raggiunto sistematicamente la saturazione (\textbf{100\%}), introducendo latenze nell'ordine dei millisecondi ($\sim$1-4 ms) e rischiando la perdita di pacchetti a livello di kernel. L'aumento della dimensione della coda (Tuning a 10k) ha mitigato la saturazione ma ha aggravato la latenza media, confermando la presenza di un collo di bottiglia computazionale e non di memoria.
+        
+        \item \textbf{L'Efficacia del Multi-Threading:} Il passaggio a un pool di 4 thread analizzatori ha eliminato radicalmente il collo di bottiglia. La latenza media è crollata da valori millimetrici a circa \textbf{14 $\mu$s} (un miglioramento di oltre due ordini di grandezza), garantendo prestazioni \textit{Real-Time}. La capacità di smaltimento parallelo ha mantenuto la coda quasi vuota ($<1\%$) nella maggior parte degli scenari, trasformando il buffer da "parcheggio critico" a semplice area di transito.
+        
+        \item \textbf{Resilienza e Isolamento:} I test in ambiente Multi-LAN (3.b/3.c) hanno dimostrato che l'architettura è in grado di isolare i flussi di traffico. Anche sotto un attacco Denial of Service massiccio (50.000 pacchetti malevoli), il sistema ha preservato l'integrità del traffico legittimo concorrente, processando il 100\% dei pacchetti validi senza perdite.
+    \end{itemize}
+
+        \subsubsection{Scelta della Configurazione Ottimale}
+
+        Alla luce delle evidenze raccolte, la configurazione identificata come \textbf{ottimale} per l'impiego in produzione è la seguente: \textbf{4 Thread Analizzatori + Coda da 10.000 Slot}.
+
+        Questa combinazione offre il miglior bilanciamento tra prestazioni e robustezza:
+        \begin{enumerate}
+            \item I \textbf{4 Thread} garantiscono una latenza media minima ($\sim$10-20 $\mu$s) e un throughput sostenuto superiore ai 34.000 PPS.
+            \item La \textbf{Coda da 10.000 slot}, pur non essendo strettamente necessaria per il traffico ordinario (dove basterebbero 1.000 slot), fornisce un margine di sicurezza indispensabile per assorbire picchi improvvisi di attacco DoS senza raggiungere la saturazione (picco massimo osservato: 17\%), eliminando virtualmente il rischio di packet loss senza introdurre bufferbloat grazie alla velocità di consumo dei thread.
+        \end{enumerate}
+
+        La scelta di aumentare la dimensione della coda a 10.000 slot è stata validata analizzando l'impatto sull'occupazione di memoria RAM, che risulta assolutamente trascurabile anche per dispositivi con risorse limitate. Considerando la struttura \texttt{arp\_association\_t}: 
+
+        \begin{itemize}
+            \item \texttt{mac\_addr} (6 byte) + \texttt{mac\_addr\_sender} (6 byte) + \texttt{ip\_addr} (4 byte) = 16 byte.
+            \item \texttt{struct timespec} (per la latenza) $\approx$ 16 byte (su architetture a 64 bit).
+            \item Allineamento e padding del compilatore $\approx$ stimati in 0-8 byte.
+        \end{itemize}
+        
+        La dimensione di una singola associazione è quindi di circa 32-40 byte.
+
+        \noindent Moltiplicando per 10.000 elementi e aggiungendo l'overhead per i puntatori nel buffer circolare (8 byte per puntatore su 64 bit), il consumo complessivo di memoria si attesta intorno ai 400-500 KB (0.5 MB). Su un router entry-level con 256 MB o 512 MB di RAM, questa struttura occupa meno dello 0.2\% della memoria disponibile, confermando che il sovradimensionamento della coda per prevenire la saturazione è una strategia a costo quasi nullo in termini di risorse.
+
+
+    
