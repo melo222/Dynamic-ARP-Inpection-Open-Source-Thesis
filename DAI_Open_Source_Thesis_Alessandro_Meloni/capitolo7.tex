@@ -47,7 +47,19 @@ In questa sezione finale si discutono le prospettive evolutive del progetto \tex
         
         Questa funzionalità prevede la strutturazione dei file di log in modo gerarchico o separato per ogni interfaccia monitorata (es. \texttt{dai\_log\_enp0s8.csv}, \texttt{dai\_log\_enp0s9.csv}).
         Ciò permetterebbe agli amministratori di rete di isolare rapidamente l'origine di un attacco e di generare statistiche di carico specifiche per sottorete, migliorando notevolmente le capacità di \textit{network forensics} e troubleshooting. 
-        % Inoltre, sarebbe auspicabile l'integrazione con il protocollo \textit{Syslog} per centralizzare gli alert su server SIEM remoti.
+        
+        \subsubsection{Integrazione con Protocollo Syslog}
+        Mentre il logging su file CSV locale è funzionale per le fasi di debug e testing in laboratorio, l'impiego in ambienti di produzione distribuiti richiede l'adozione di standard industriali per la gestione degli eventi. Un miglioramento implementativo cruciale è il supporto nativo al protocollo \textbf{Syslog} (RFC 5424 \cite{rfc5424}).
+
+        L'evoluzione dal salvataggio su disco locale all'invio dei messaggi verso un server remoto (tramite socket UDP o TCP) apporterebbe tre vantaggi strategici fondamentali per una soluzione di sicurezza \textit{Enterprise}:
+
+        \begin{itemize}
+            \item \textbf{Centralizzazione del Monitoraggio:} In una rete segmentata in cui operano molteplici istanze del daemon DAI su diversi router o switch, Syslog permette di aggregare tutti gli allarmi in un unico \textit{Log Collector} centrale, eliminando la necessità di accedere singolarmente a ogni dispositivo per verificare lo stato della rete.
+            
+            \item \textbf{Integrità Forense (Tamper Resistance):} In uno scenario di attacco in cui il router stesso venisse compromesso, l'attaccante avrebbe la possibilità di cancellare i file di log locali per eliminare le tracce della propria attività. Trasmettendo i log in tempo reale a un server remoto sicuro, si garantisce la persistenza delle evidenze (\textit{Non-Repudiation}) anche in caso di compromissione o guasto del nodo di rilevamento.
+            
+            \item \textbf{Interoperabilità con sistemi SIEM:} L'adozione di un formato standard renderebbe il DAI immediatamente compatibile con le piattaforme SIEM (\textit{Security Information and Event Management}). Questo permetterebbe di correlare automaticamente gli eventi di ARP Spoofing con altri allarmi di sicurezza (es. traffico anomalo sul Firewall), innescando risposte automatiche coordinate.
+        \end{itemize}
 
         \subsubsection{Prestazioni e Strutture Dati}
         Come analizzato nel capitolo relativo all'implementazione, l'attuale meccanismo di validazione si basa su una ricerca sequenziale all'interno di un array dinamico. Sebbene efficace per reti di dimensioni contenute, questa soluzione presenta una complessità computazionale lineare $O(n)$.
