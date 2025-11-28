@@ -1,0 +1,8 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{num}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{o}{*}\PYG{+w}{ }\PYG{n}{stdout\PYGZus{}mutex}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{lease\PYGZus{}cache\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{lease\PYGZus{}cache}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{queue}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{analyzer\PYGZus{}t\PYGZus{}args}\PYG{p}{;}
+\end{MintedVerbatim}

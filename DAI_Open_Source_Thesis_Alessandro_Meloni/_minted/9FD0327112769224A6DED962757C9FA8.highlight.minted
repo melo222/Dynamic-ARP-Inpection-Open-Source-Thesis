@@ -1,0 +1,17 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{analyze\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{association}\PYG{p}{,}
+\PYG{+w}{                                    }\PYG{n}{lease\PYGZus{}cache\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{lease\PYGZus{}cache}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+
+\PYG{+w}{            }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}str}\PYG{p}{[}\PYG{l+m+mi}{18}\PYG{p}{]}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}sender}\PYG{p}{[}\PYG{l+m+mi}{18}\PYG{p}{]}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}addr}\PYG{p}{[}\PYG{n}{INET\PYGZus{}ADDRSTRLEN}\PYG{p}{]}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{c+c1}{// Conversione da formato binario (network byte order) a stringa}
+\PYG{+w}{            }\PYG{n}{mac\PYGZus{}to\PYGZus{}str}\PYG{p}{(}\PYG{n}{association}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mac\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}str}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{mac\PYGZus{}to\PYGZus{}str}\PYG{p}{(}\PYG{n}{association}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mac\PYGZus{}addr\PYGZus{}sender}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}sender}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{inet\PYGZus{}ntop}\PYG{p}{(}\PYG{n}{AF\PYGZus{}INET}\PYG{p}{,}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{n}{association}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{ip\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{INET\PYGZus{}ADDRSTRLEN}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{c+c1}{// Verifica della corrispondenza IP\PYGZhy{}MAC nel database DHCP}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{is\PYGZus{}valid}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{lease\PYGZus{}cache\PYGZus{}check}\PYG{p}{(}\PYG{n}{lease\PYGZus{}cache}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}addr}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}str}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{c+c1}{// ... gestione dell\PYGZsq{}esito (Log / Alert / ...)}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\end{MintedVerbatim}

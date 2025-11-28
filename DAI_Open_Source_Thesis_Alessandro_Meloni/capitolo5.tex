@@ -115,16 +115,15 @@ Nel seguente capitolo viene descritta in dettaglio l'implementazione open source
     Nella presente sezione si presenta il cuore dei file sorgenti che compongono il programma. Ovviamente, tenuto conto della lunghezza, verranno presentati degli estratti delle principali funzionalità con relative descrizioni.
 
         \subsection{Implementazione del Receiver}
-        
+
         Di seguito viene riportata la definizione della struttura dati utilizzata per passare gli argomenti al thread di ricezione:
-        
+
         \begin{minted}[
             frame=lines,
             framesep=1mm,
             baselinestretch=1,
             bgcolor=codebg,
-            fontsize=\footnotesize,
-            % linenos
+            fontsize=\footnotesize
         ]{c}
         typedef struct {
             int num;
@@ -133,81 +132,329 @@ Nel seguente capitolo viene descritta in dettaglio l'implementazione open source
             arp_association_queue_t *queue;
         } receiver_t_args;
         \end{minted}
-        
+
         I campi della struttura \texttt{receiver\_t\_args} svolgono le seguenti funzioni:
         \begin{description}
             \item[\texttt{1. stdout\_mutex}] Puntatore al mutex per sincronizzare la stampa su terminale (debug).
             \item[\texttt{2. interface}] Stringa contenente il nome dell'interfaccia di rete (es. \texttt{enp0s8}).
             \item[\texttt{3. queue}] Puntatore alla coda thread-safe dove verranno inseriti i pacchetti ARP parsati.
         \end{description}
-        
+
         Successivamente, il ciclo principale di acquisizione viene eseguito dalla funzione \texttt{receiver\_thread}. La funzione inizializza l'handle \texttt{pcap}, applica il filtro BPF per intercettare solo le ARP Reply ed entra in un loop infinito di ascolto:
-        
+
         \begin{minted}[
             frame=lines,
             framesep=1mm,
             baselinestretch=1,
             bgcolor=codebg,
             fontsize=\footnotesize,
-            % linenos,
-            breaklines % Spezza le righe troppo lunghe automaticamente
+            breaklines
         ]{c}
-         void *receiver_thread(void *args) {
+        void *receiver_thread(void *args) {
             receiver_t_args* t_args = (receiver_t_args *) args;
             pcap_t *handle;   
             struct bpf_program fp;   
             bpf_u_int32 net = 0;
-        ...
+            // ... setup variabili ...
+
             handle = pcap_open_live(t_args->interface, BUFSIZ, 1, 1000, errbuf);
-            const char *arp_filter = "arp and arp[7] == 2";
+            const char *arp_filter = "arp and arp[7] == 2"; // Filtro per ARP Reply
             pcap_compile(handle, &fp, arp_filter, 1, net);
             pcap_setfilter(handle, &fp);
+            
             struct pcap_pkthdr header;
             const unsigned char *packet;
+
             while (1) {
-                packet = pcap_next(handle, &header){
+                packet = pcap_next(handle, &header);
                 if (packet) {
-                    if (header.caplen >= 14 + 28)
-                        const unsigned char *mac_sender = packet + 6
+                    // Check lunghezza minima header Ethernet + ARP
+                    if (header.caplen >= 14 + 28) {
+                        const unsigned char *mac_sender = packet + 6;
                         const unsigned char *arp_header = packet + 14;
                         const unsigned char *mac_bind = arp_header + 8; 
                         const unsigned char *ip_bind = arp_header + 14; 
+                        
                         arp_association_t association;
                         memcpy(association.mac_addr, mac_bind, ETH_ALEN);
                         memcpy(&association.ip_addr, ip_bind, 4);
                         memcpy(association.mac_addr_sender, mac_sender, ETH_ALEN);
-        ...
+                        
+                        // ... setup timestamp ...
+
                         arp_association_queue_t *arp_queue = t_args->queue;
                         enqueue_arp_association(arp_queue, association);
                     }
-               } 
+            } 
             }
         }
         \end{minted}
 
-    
-    
-    Tabella \ref{tab:sommario_file} riassuntiva dei file per una panoramica più completa.
-    \begin{table}[h]
-        \centering
-        \begin{tabular}{|p{3cm}|p{8cm}|}
-            \hline
-            \textbf{File} & \textbf{Descrizione} \\
-            \hline
-            \texttt{main.c} & Inizializzazione del daemon, allocazione delle risorse condivise (coda e cache) e avvio dei thread \\
-            \hline
-            \texttt{queue.c} & Implementazione del Ring Buffer centrale e delle primitive di sincronizzazione Mutex e Variabili di Condizione \\
-            \hline
-            \texttt{receiver.c} & Acquisizione dei pacchetti ARP Reply a Livello 2 e inserimento nella coda condivisa \\
-            \hline
-            \texttt{analyzer.c} & Estrazione, parsing e validazione della tripla $\langle \text{IP, MAC, Sender MAC} \rangle$ tramite l'interrogazione della cache. \\
-            \hline
-            \texttt{lease\_t.c} & Implementazione del thread di aggiornamento periodico della Cache delle Lease DHCP (I/O)\\
-            \hline
-        \end{tabular}
-        \caption{Sommario file del progetto}
-        \label{tab:sommario_file}
-    \end{table}
+        \subsection{Struttura della Coda e Gestione della Concorrenza}
 
-    \subsection{Librerie di Sviluppo C Utilizzate} % Qui citi pcap, pthread, ecc.
+        Per disaccoppiare la fase di cattura (ad alta frequenza) dalla fase di analisi (potenzialmente più lenta), è stata implementata una coda circolare (Circular Buffer) thread-safe. Questa struttura agisce come buffer intermedio secondo il pattern Produttore-Consumatore.
 
+        Di seguito vengono riportate le strutture dati fondamentali definite nell'header file della coda:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{c}
+        #define ARP_QUEUE_SIZE 1000
+
+        // Struct dell'associazione MAC - IP - MAC Sender ricevuta dal receiver
+        typedef struct {
+            unsigned char mac_addr[ETH_ALEN];
+            struct in_addr ip_addr;
+            unsigned char mac_addr_sender[ETH_ALEN];
+        } arp_association_t;
+
+        // Coda Circolare Thread-Safe
+        typedef struct {
+            arp_association_t *buffer[ARP_QUEUE_SIZE];
+            int head;
+            int tail;
+            int count;
+            pthread_mutex_t mutex;          // Primitive di sincronizzazione
+            pthread_cond_t not_full;
+            pthread_cond_t not_empty;            
+            pthread_mutex_t *stdout_mutex;
+        } arp_association_queue_t;
+
+        // Interfaccia pubblica della coda
+        void arp_queue_init(arp_association_queue_t *queue,
+                             pthread_mutex_t *stdout_mutex);
+        void enqueue_arp_association(arp_association_queue_t *queue,
+                                     arp_association_t association);
+        arp_association_t *dequeue_arp_association(arp_association_queue_t *queue);
+        \end{minted}
+
+        La struttura \texttt{arp\_association\_queue\_t} integra le primitive di sincronizzazione POSIX (\texttt{pthread\_mutex} e \texttt{pthread\_cond}) necessarie per garantire l'accesso esclusivo al buffer condiviso.
+        In particolare, \texttt{not\_full} e \texttt{not\_empty} permettono di sospendere rispettivamente il thread \textit{Receiver} quando la coda è piena e il thread \textit{Analyzer} quando la coda è vuota, ottimizzando l'uso della CPU ed evitando attese attive (spin-lock).
+            
+        \subsection{Implementazione dell'Analyzer}
+
+        Il componente \textit{Analyzer} agisce come consumatore all'interno dell'architettura. Il suo compito è prelevare le associazioni dalla coda e verificarne la legittimità confrontandole con il database delle assegnazioni DHCP (Lease Cache).
+
+        La struttura dati passata come argomento ai thread di analisi contiene i riferimenti alle risorse condivise necessarie per l'operazione:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{c}
+        typedef struct {
+            int num;
+            pthread_mutex_t* stdout_mutex;
+            lease_cache_t *lease_cache;
+            arp_association_queue_t *queue;
+        } analyzer_t_args;
+        \end{minted}
+
+        I campi principali sono:
+        \begin{description}
+            \item[\texttt{lease\_cache}] Puntatore alla struttura dati che mantiene lo stato corrente delle assegnazioni IP-MAC (DHCP Snooping database).
+            \item[\texttt{queue}] Riferimento alla coda condivisa popolata dal Receiver.
+        \end{description}
+
+        Il ciclo di vita del thread è definito nella funzione \texttt{analyzer\_thread}. Questa implementa un loop continuo che esegue l'operazione di \texttt{dequeue}: se la coda restituisce un elemento valido, viene invocata la logica di analisi, altrimenti il thread attende (tramite le condition variable interne alla coda).
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize,
+            breaklines
+        ]{c}
+        void *analyzer_thread(void *args) {
+            analyzer_t_args *t_args = (analyzer_t_args *) args;
+            arp_association_queue_t *arp_queue = t_args->queue; 
+
+            while (1) {
+                // Prelievo bloccante dalla coda thread-safe
+                arp_association_t *association = dequeue_arp_association(arp_queue);
+
+                if (association) {
+                    // Avvio analisi logica
+                    analyze_arp_association(association, t_args->lease_cache); 
+                    
+                    // Rilascio della memoria allocata per l'associazione
+                    free_arp_association(association);     
+                }
+            }
+            pthread_exit(NULL);
+        }
+        \end{minted}
+
+        La funzione \texttt{analyze\_arp\_association} si occupa di trasformare i dati grezzi di rete (byte array) in stringhe leggibili e di interrogare la cache.
+        
+        Si noti che la logica di validazione effettiva è delegata al modulo \textit{Lease Cache}, garantendo una separazione delle responsabilità.
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize,
+            breaklines
+        ]{c}
+        void analyze_arp_association(arp_association_t *association, 
+                                    lease_cache_t *lease_cache) {
+            
+            char mac_str[18], mac_sender[18], ip_addr[INET_ADDRSTRLEN];
+            
+            // Conversione da formato binario (network byte order) a stringa
+            mac_to_str(association->mac_addr, mac_str);
+            mac_to_str(association->mac_addr_sender, mac_sender);
+            inet_ntop(AF_INET, &association->ip_addr, ip_addr, INET_ADDRSTRLEN);
+
+            // Verifica della corrispondenza IP-MAC nel database DHCP
+            int is_valid = lease_cache_check(lease_cache, ip_addr, mac_str);
+            
+            // ... gestione dell'esito (Log / Alert / ...) 
+        }
+        \end{minted}
+
+        Come mostrato nell'ultimo frammento, la decisione finale sulla legittimità del pacchetto ARP dipende dal valore restituito da \texttt{lease\_cache\_check}, la cui implementazione interna verrà approfondita nella sezione successiva dedicata alla gestione dei Lease DHCP.
+
+
+        \subsection{Gestione dei Lease DHCP e Validazione}
+
+        Il componente \textit{Lease Cache} rappresenta la fonte di verità per il sistema DAI. Esso mantiene in memoria una lista aggiornata delle associazioni IP-MAC valide, ottenute parsando il file dei lease del server DHCP (es. \texttt{dnsmasq.leases}).
+
+        Per questa implementazione prototipale, le costanti relative agli intervalli di aggiornamento e, in particolare, agli indirizzi fisici e logici del Router (Gateway) sono state definite staticamente tramite macro del preprocessore.
+
+        Si sottolinea che l'uso di indirizzi hardcoded (\texttt{ROUTER\_IP\_STR} e \texttt{ROUTER\_MAC\_STR}) costituisce una limitazione nota dell'attuale versione, introdotta per semplificare l'ambiente di test. Una gestione dinamica della configurazione del gateway è prevista e sarà discussa nel capitolo \ref{capitolo7} conclusivo relativo agli sviluppi futuri.
+
+        Di seguito le strutture dati e le definizioni principali:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{c}
+        #define UPDATE_INTERVAL 5
+        #define MAC_LEN 17
+        #define IP_LEN INET_ADDRSTRLEN
+
+        // Indirizzi statici del Router per le due sottoreti (limitazione attuale)
+        #define ROUTER_IP_STR    "192.168.10.1"
+        #define ROUTER_MAC_STR   "08:00:27:68:55:09" 
+        #define ROUTER_IP_STR2   "192.168.20.1"
+        #define ROUTER_MAC_STR2  "08:00:27:02:39:b1" 
+
+        // Associazione IP-MAC singola
+        typedef struct {
+            char mac[MAC_LEN + 1]; // +1 per terminatore \0
+            char ip[IP_LEN];       
+        } lease_entry_t;
+
+        // Struttura per la cache globale dei lease (Thread-Safe)
+        typedef struct {
+            lease_entry_t *entries;  // array dinamico di lease
+            size_t count;            // numero attuale di lease
+            pthread_mutex_t *mutex;  // protezione accesso concorrente
+            pthread_mutex_t *stdout_mutex;
+        } lease_cache_t;
+
+        // Argomenti per il thread di aggiornamento periodico
+        typedef struct {
+            lease_cache_t *cache;
+            int update_interval_sec; 
+        } lease_updater_t_args;
+        \end{minted}
+
+        La funzione cuore della validazione è \texttt{lease\_cache\_check}. Questa funzione viene invocata dall'Analyzer per ogni pacchetto ARP ricevuto.
+        Il controllo avviene in due fasi: prima si verifica se la coppia IP-MAC è presente nel database dei lease DHCP; se la ricerca fallisce, si controlla se l'associazione corrisponde a uno degli indirizzi legittimi del Router (Gateway), permettendo così il traffico infrastrutturale essenziale.
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize,
+            breaklines
+        ]{c}
+    int lease_cache_check(lease_cache_t *cache, 
+                        const char *search_ip_str, 
+                        const char *search_mac_str) {
+        int found = 0;
+
+        // Accesso in lettura protetto da Mutex
+        pthread_mutex_lock(cache->mutex);
+        
+        for (size_t i = 0; i < cache->count; i++) {
+            // Confronto stringhe case-insensitive per il MAC
+            if (strcmp(cache->entries[i].ip, search_ip_str) == 0 && 
+                strcasecmp(cache->entries[i].mac, search_mac_str) == 0) {
+                found = 1;
+                break;
+            }
+            
+            // Se non trovato nei lease, verifica se è un Router legittimo con test-case
+            if (!found) {
+                int is_router_mac = (strcasecmp(search_mac_str, ROUTER_MAC_STR) == 0 || 
+                                    strcasecmp(search_mac_str, ROUTER_MAC_STR2) == 0);
+                int is_router_ip  = (strcmp(search_ip_str, ROUTER_IP_STR) == 0 || 
+                                    strcmp(search_ip_str, ROUTER_IP_STR2) == 0);
+
+                if (is_router_mac && is_router_ip) {
+                    found = 1;
+                    break;
+                }
+            }
+        }
+        
+        pthread_mutex_unlock(cache->mutex);
+        return found;
+    }
+        \end{minted}
+
+
+
+
+
+        \subsection{Librerie e Struttura dei File Sorgente}
+
+        Lo sviluppo del demone è stato realizzato interamente in linguaggio C, sfruttando un insieme selezionato di librerie standard e specifiche per il networking al fine di garantire performance e controllo a basso livello.
+
+        Le dipendenze principali del progetto sono:
+        \begin{itemize}
+            \item \textbf{Libpcap}: Libreria standard de facto per la cattura di pacchetti di rete. Utilizzata nel modulo \textit{Receiver} per l'interfacciamento con il device driver della scheda di rete in modalità promiscua e per il filtraggio efficiente tramite BPF (Berkeley Packet Filter).
+            \item \textbf{POSIX Threads (Pthread)}: Libreria conforme allo standard IEEE 1003.1c per la gestione della programmazione concorrente. Essenziale per l'orchestrazione dei thread \textit{Receiver}, \textit{Analyzer} e \textit{Lease Updater}, nonché per le primitive di sincronizzazione (Mutex e Condition Variables) necessarie alla gestione della coda condivisa.
+            \item \textbf{Standard C Library (glibc)}: Utilizzata per la gestione della memoria, manipolazione delle stringhe e operazioni di I/O, incluse le socket API (\texttt{sys/socket.h}, \texttt{arpa/inet.h}) per la gestione degli indirizzi IP.
+        \end{itemize}
+
+        La tabella \ref{tab:sommario_file} riassume l'organizzazione dei file sorgente del progetto, evidenziando le responsabilità di ciascun modulo.
+
+        \begin{table}[H]
+            \centering
+            \renewcommand{\arraystretch}{1.3} 
+            % >{\raggedright\arraybackslash} serve a non giustificare il testo forzatamente,
+            % eliminando gli spazi bianchi enormi (Underfull hbox) nelle colonne strette.
+            \begin{tabular}{|p{3cm}|>{\raggedright\arraybackslash}p{8.5cm}|}
+                \hline
+                \textbf{File Sorgente} & \textbf{Descrizione Funzionale} \\
+                \hline
+                \texttt{main.c} & Entry point dell'applicazione. Gestisce il parsing degli argomenti, l'inizializzazione delle strutture dati globali, la gestione dei segnali di sistema (es. \texttt{SIGINT} per graceful shutdown) e l'avvio dei thread principali. \\
+                \hline
+                \texttt{queue.c} & Implementazione della struttura dati \textit{Ring Buffer} (Coda Circolare). Incapsula le logiche di inserimento e prelievo thread-safe, gestendo la sincronizzazione tra Produttore e Consumatore. \\
+                \hline
+                \texttt{receiver.c} & Modulo di interfaccia di rete. Configura la sessione di cattura \texttt{pcap}, compila e applica i filtri BPF per isolare il traffico ARP e popola la coda condivisa con i pacchetti grezzi. \\
+                \hline
+                \texttt{analyzer.c} & Core logic del sistema DAI. Preleva i pacchetti dalla coda, effettua il parsing dei protocolli Ethernet/ARP e convalida la tripla $\langle$IP, MAC, Sender MAC$\rangle$ interrogando la cache. \\
+                \hline
+                \texttt{lease\_cache.c} & Gestione della "Source of Truth". Implementa il thread periodico che legge il file di lease del server DHCP (I/O su disco), aggiorna la struttura dati in memoria e fornisce l'interfaccia di ricerca sicura (\texttt{thread-safe read}). \\
+                \hline
+            \end{tabular}
+            \caption{Sommario dell'organizzazione dei file sorgente del progetto}
+            \label{tab:sommario_file}
+        \end{table}

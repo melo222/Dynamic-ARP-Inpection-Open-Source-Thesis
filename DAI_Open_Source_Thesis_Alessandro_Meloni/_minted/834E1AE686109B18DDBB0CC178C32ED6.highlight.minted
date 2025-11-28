@@ -1,0 +1,31 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define UPDATE\PYGZus{}INTERVAL 5}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define MAC\PYGZus{}LEN 17}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define IP\PYGZus{}LEN INET\PYGZus{}ADDRSTRLEN}
+
+\PYG{+w}{        }\PYG{c+c1}{// Indirizzi statici del Router per le due sottoreti (limitazione attuale)}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define ROUTER\PYGZus{}IP\PYGZus{}STR    \PYGZdq{}192.168.10.1\PYGZdq{}}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define ROUTER\PYGZus{}MAC\PYGZus{}STR   \PYGZdq{}08:00:27:68:55:09\PYGZdq{}}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define ROUTER\PYGZus{}IP\PYGZus{}STR2   \PYGZdq{}192.168.20.1\PYGZdq{}}
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define ROUTER\PYGZus{}MAC\PYGZus{}STR2  \PYGZdq{}08:00:27:02:39:b1\PYGZdq{}}
+
+\PYG{+w}{        }\PYG{c+c1}{// Associazione IP\PYGZhy{}MAC singola}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac}\PYG{p}{[}\PYG{n}{MAC\PYGZus{}LEN}\PYG{+w}{ }\PYG{o}{+}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{]}\PYG{p}{;}\PYG{+w}{ }\PYG{c+c1}{// +1 per terminatore \PYGZbs{}0}
+\PYG{+w}{            }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{ip}\PYG{p}{[}\PYG{n}{IP\PYGZus{}LEN}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{lease\PYGZus{}entry\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Struttura per la cache globale dei lease (Thread\PYGZhy{}Safe)}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{lease\PYGZus{}entry\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{entries}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// array dinamico di lease}
+\PYG{+w}{            }\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{count}\PYG{p}{;}\PYG{+w}{            }\PYG{c+c1}{// numero attuale di lease}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{mutex}\PYG{p}{;}\PYG{+w}{  }\PYG{c+c1}{// protezione accesso concorrente}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{stdout\PYGZus{}mutex}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{lease\PYGZus{}cache\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Argomenti per il thread di aggiornamento periodico}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{lease\PYGZus{}cache\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{cache}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{update\PYGZus{}interval\PYGZus{}sec}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{lease\PYGZus{}updater\PYGZus{}t\PYGZus{}args}\PYG{p}{;}
+\end{MintedVerbatim}

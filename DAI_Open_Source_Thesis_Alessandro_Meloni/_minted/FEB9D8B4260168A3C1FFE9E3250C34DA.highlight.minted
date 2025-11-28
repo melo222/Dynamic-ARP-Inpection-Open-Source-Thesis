@@ -1,0 +1,20 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{o}{*}\PYG{n+nf}{analyzer\PYGZus{}thread}\PYG{p}{(}\PYG{k+kt}{void}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{args}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{analyzer\PYGZus{}t\PYGZus{}args}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{t\PYGZus{}args}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{analyzer\PYGZus{}t\PYGZus{}args}\PYG{+w}{ }\PYG{o}{*}\PYG{p}{)}\PYG{+w}{ }\PYG{n}{args}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{arp\PYGZus{}queue}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{t\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{queue}\PYG{p}{;}
+
+\PYG{+w}{            }\PYG{k}{while}\PYG{+w}{ }\PYG{p}{(}\PYG{l+m+mi}{1}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{c+c1}{// Prelievo bloccante dalla coda thread\PYGZhy{}safe}
+\PYG{+w}{                }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{association}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{n}{dequeue\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{arp\PYGZus{}queue}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{                }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{association}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                    }\PYG{c+c1}{// Avvio analisi logica}
+\PYG{+w}{                    }\PYG{n}{analyze\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{association}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{t\PYGZus{}args}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{lease\PYGZus{}cache}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{                    }\PYG{c+c1}{// Rilascio della memoria allocata per l\PYGZsq{}associazione}
+\PYG{+w}{                    }\PYG{n}{free\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{association}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{                }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}exit}\PYG{p}{(}\PYG{n+nb}{NULL}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+\end{MintedVerbatim}

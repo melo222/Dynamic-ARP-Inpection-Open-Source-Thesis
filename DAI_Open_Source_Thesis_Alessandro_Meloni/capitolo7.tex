@@ -1,4 +1,5 @@
 \chapter{Conclusioni e Futuro del Progetto}
+\label{capitolo7}
 In quest'ultimo capitolo viene conclusa la panoramica attorno al progetto della Dynamic ARP Inspection Open Source, riassumendo i traguardi raggiunti, evidenziando gli aspetti negativi e proponendo dei miglioramenti e delle prospettive per il futuro del progetto. 
 
     \section{Risultati Ottenuti}
@@ -21,17 +22,21 @@ In quest'ultimo capitolo viene conclusa la panoramica attorno al progetto della 
 
         Nonostante i risultati positivi, il prototipo sviluppato presenta alcune limitazioni intrinseche, derivanti sia dall'ambiente di sviluppo simulato che da scelte progettuali semplificative, che ne circoscrivono l'attuale applicabilità in scenari di produzione complessi.
 
-        \subsubsection{Limitazioni realistiche in ambiente Multi-Rete e Multi Livello}
+            \subsubsection{Limitazioni realistiche in ambiente Multi-Rete e Multi Livello}
             Una prima limitazione riguarda il posizionamento topologico dell'applicativo. Nel contesto simulato, il software DAI è stato eseguito direttamente a bordo del router (gateway), agendo sulle interfacce verso le sottoreti.
             Questa configurazione differisce dalla classica implementazione DAI \textit{Switch-Based}, dove il controllo avviene sugli switch di accesso (Layer 2) direttamente collegati agli host.
-            
+        
             Eseguire il DAI sul router protegge efficacemente il gateway e le comunicazioni inter-subnet, ma potrebbe non essere sufficiente a isolare due client malevoli che comunicano tra loro all'interno dello stesso segmento di rete (stesso dominio di broadcast) se il traffico non attraversa il router. In un ambiente reale, l'applicativo dovrebbe idealmente girare su dispositivi che agiscono come switch \textit{managed}.
 
-        \subsubsection{Dipendenza dal Servizio DHCP Locale}
+            \subsubsection{Dipendenza dal Servizio DHCP Locale}
             La limitazione più critica dell'attuale implementazione risiede nella stretta dipendenza dalla posizione del server DHCP. Il software assume che il servizio DHCP risieda sullo stesso host fisico e accede direttamente al file di lease locale per costruire la tabella di fiducia. A proposito di "tabella di fiducia", non si è inoltre considerata l'affidabilità del servizio e l'integrità di questa tabella nel caso di cui sopra, dove DHCP non risieda nello stesso dispositivo di rete.
 
             Questa assunzione di "DHCP affidabile e locale" non rispecchia la realtà delle reti strutturate o Enterprise, dove il server DHCP è spesso centralizzato, remoto o distribuito su macchine dedicate diverse dagli apparati di rete. L'attuale architettura non prevede un meccanismo per acquisire le associazioni IP-MAC da server DHCP remoti (DHCP Snooping remoto), rendendo l'applicativo inefficace in topologie dove il router non è anche il gestore degli indirizzi.
             
+            \subsubsection{Dinamicità degli indirizzi di Gateway}
+            Al momento, gli indirizzi IP e MAC dei Gateway presenti sulla macchina sono staticamete caricati nel modulo \texttt{lease\_t.c} nel file di lease in cache. Ciò per via della limitazione precedente di avere l'applicativo presente sul router, dunque comporta che una ARP Request verso un'altra rete avvia il processo di ARP Proxy dove il mittente riceve una ARP Reply dal Gateway della rete in cui era presente il destinatario. Questo comporta che lo stesso Router invia un ARP Reply "falsificata", in cui è presente l'IP del Gateway dell'altra rete ma con il MAC del Gateway della rete del mittente, creando un falso positivo per il DAI.
+
+            Questa limitazione viene gestita staticamente caricando le eccezioni in memoria prima dell'avvio dell'applicativo, operazione strettamente necessaria solo per via di questa limitazione ma in caso di effettiva integrazione in componenti livello 2 managed bisognerebbe aggiornare questa gestione in via eccezionale.
 
 
 \section{Il Futuro}

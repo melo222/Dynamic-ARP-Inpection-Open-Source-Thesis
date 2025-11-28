@@ -1,0 +1,29 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{        }\PYG{c+cp}{\PYGZsh{}}\PYG{c+cp}{define ARP\PYGZus{}QUEUE\PYGZus{}SIZE 1000}
+
+\PYG{+w}{        }\PYG{c+c1}{// Struct dell\PYGZsq{}associazione MAC \PYGZhy{} IP \PYGZhy{} MAC Sender ricevuta dal receiver}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}addr}\PYG{p}{[}\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k}{struct}\PYG{+w}{ }\PYG{n+nc}{in\PYGZus{}addr}\PYG{+w}{ }\PYG{n}{ip\PYGZus{}addr}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{unsigned}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{n}{mac\PYGZus{}addr\PYGZus{}sender}\PYG{p}{[}\PYG{n}{ETH\PYGZus{}ALEN}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Coda Circolare Thread\PYGZhy{}Safe}
+\PYG{+w}{        }\PYG{k}{typedef}\PYG{+w}{ }\PYG{k}{struct}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{buffer}\PYG{p}{[}\PYG{n}{ARP\PYGZus{}QUEUE\PYGZus{}SIZE}\PYG{p}{]}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{head}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{tail}\PYG{p}{;}
+\PYG{+w}{            }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{count}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{n}{mutex}\PYG{p}{;}\PYG{+w}{          }\PYG{c+c1}{// Primitive di sincronizzazione}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}cond\PYGZus{}t}\PYG{+w}{ }\PYG{n}{not\PYGZus{}full}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}cond\PYGZus{}t}\PYG{+w}{ }\PYG{n}{not\PYGZus{}empty}\PYG{p}{;}
+\PYG{+w}{            }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{stdout\PYGZus{}mutex}\PYG{p}{;}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}\PYG{+w}{ }\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Interfaccia pubblica della coda}
+\PYG{+w}{        }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{arp\PYGZus{}queue\PYGZus{}init}\PYG{p}{(}\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{queue}\PYG{p}{,}
+\PYG{+w}{                             }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{stdout\PYGZus{}mutex}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k+kt}{void}\PYG{+w}{ }\PYG{n+nf}{enqueue\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{queue}\PYG{p}{,}
+\PYG{+w}{                                     }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{n}{association}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{n}{arp\PYGZus{}association\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n+nf}{dequeue\PYGZus{}arp\PYGZus{}association}\PYG{p}{(}\PYG{n}{arp\PYGZus{}association\PYGZus{}queue\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{queue}\PYG{p}{)}\PYG{p}{;}
+\end{MintedVerbatim}

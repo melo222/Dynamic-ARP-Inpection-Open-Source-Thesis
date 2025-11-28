@@ -1,0 +1,35 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+\PYG{+w}{    }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n+nf}{lease\PYGZus{}cache\PYGZus{}check}\PYG{p}{(}\PYG{n}{lease\PYGZus{}cache\PYGZus{}t}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{cache}\PYG{p}{,}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{search\PYGZus{}ip\PYGZus{}str}\PYG{p}{,}
+\PYG{+w}{                        }\PYG{k}{const}\PYG{+w}{ }\PYG{k+kt}{char}\PYG{+w}{ }\PYG{o}{*}\PYG{n}{search\PYGZus{}mac\PYGZus{}str}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{        }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{found}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{c+c1}{// Accesso in lettura protetto da Mutex}
+\PYG{+w}{        }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}lock}\PYG{p}{(}\PYG{n}{cache}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mutex}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{        }\PYG{k}{for}\PYG{+w}{ }\PYG{p}{(}\PYG{k+kt}{size\PYGZus{}t}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{+w}{ }\PYG{o}{\PYGZlt{}}\PYG{+w}{ }\PYG{n}{cache}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{count}\PYG{p}{;}\PYG{+w}{ }\PYG{n}{i}\PYG{o}{+}\PYG{o}{+}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{            }\PYG{c+c1}{// Confronto stringhe case\PYGZhy{}insensitive per il MAC}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{strcmp}\PYG{p}{(}\PYG{n}{cache}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{entries}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]}\PYG{p}{.}\PYG{n}{ip}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{search\PYGZus{}ip\PYGZus{}str}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{o}{\PYGZam{}}
+\PYG{+w}{                }\PYG{n}{strcasecmp}\PYG{p}{(}\PYG{n}{cache}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{entries}\PYG{p}{[}\PYG{n}{i}\PYG{p}{]}\PYG{p}{.}\PYG{n}{mac}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{search\PYGZus{}mac\PYGZus{}str}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{n}{found}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{+w}{                }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{            }\PYG{c+c1}{// Se non trovato nei lease, verifica se è un Router legittimo con test\PYGZhy{}case}
+\PYG{+w}{            }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{o}{!}\PYG{n}{found}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{is\PYGZus{}router\PYGZus{}mac}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{strcasecmp}\PYG{p}{(}\PYG{n}{search\PYGZus{}mac\PYGZus{}str}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ROUTER\PYGZus{}MAC\PYGZus{}STR}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{|}\PYG{o}{|}
+\PYG{+w}{                                    }\PYG{n}{strcasecmp}\PYG{p}{(}\PYG{n}{search\PYGZus{}mac\PYGZus{}str}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ROUTER\PYGZus{}MAC\PYGZus{}STR2}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{                }\PYG{k+kt}{int}\PYG{+w}{ }\PYG{n}{is\PYGZus{}router\PYGZus{}ip}\PYG{+w}{  }\PYG{o}{=}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{strcmp}\PYG{p}{(}\PYG{n}{search\PYGZus{}ip\PYGZus{}str}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ROUTER\PYGZus{}IP\PYGZus{}STR}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{+w}{ }\PYG{o}{|}\PYG{o}{|}
+\PYG{+w}{                                    }\PYG{n}{strcmp}\PYG{p}{(}\PYG{n}{search\PYGZus{}ip\PYGZus{}str}\PYG{p}{,}\PYG{+w}{ }\PYG{n}{ROUTER\PYGZus{}IP\PYGZus{}STR2}\PYG{p}{)}\PYG{+w}{ }\PYG{o}{=}\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{0}\PYG{p}{)}\PYG{p}{;}
+
+\PYG{+w}{                }\PYG{k}{if}\PYG{+w}{ }\PYG{p}{(}\PYG{n}{is\PYGZus{}router\PYGZus{}mac}\PYG{+w}{ }\PYG{o}{\PYGZam{}}\PYG{o}{\PYGZam{}}\PYG{+w}{ }\PYG{n}{is\PYGZus{}router\PYGZus{}ip}\PYG{p}{)}\PYG{+w}{ }\PYG{p}{\PYGZob{}}
+\PYG{+w}{                    }\PYG{n}{found}\PYG{+w}{ }\PYG{o}{=}\PYG{+w}{ }\PYG{l+m+mi}{1}\PYG{p}{;}
+\PYG{+w}{                    }\PYG{k}{break}\PYG{p}{;}
+\PYG{+w}{                }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{            }\PYG{p}{\PYGZcb{}}
+\PYG{+w}{        }\PYG{p}{\PYGZcb{}}
+
+\PYG{+w}{        }\PYG{n}{pthread\PYGZus{}mutex\PYGZus{}unlock}\PYG{p}{(}\PYG{n}{cache}\PYG{o}{\PYGZhy{}}\PYG{o}{\PYGZgt{}}\PYG{n}{mutex}\PYG{p}{)}\PYG{p}{;}
+\PYG{+w}{        }\PYG{k}{return}\PYG{+w}{ }\PYG{n}{found}\PYG{p}{;}
+\PYG{+w}{    }\PYG{p}{\PYGZcb{}}
+\end{MintedVerbatim}
