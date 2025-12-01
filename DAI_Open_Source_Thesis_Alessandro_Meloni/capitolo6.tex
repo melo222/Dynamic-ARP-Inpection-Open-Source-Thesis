@@ -2,14 +2,15 @@
     % \section{Prerequisiti e assunzioni}
         
     \section{Criteri ed Obbiettivi}
+    \label{sez:criteri_obbiettivi}
 
-    La validazione di un sistema di sicurezza di rete come il \textit{Dynamic ARP Inspection} (DAI) non può limitarsi alla sola verifica funzionale della correttezza logica (i.e., il blocco di un pacchetto malevolo), ma deve necessariamente includere un'analisi quantitativa delle prestazioni. Essendo il DAI un componente che opera in linea sul traffico di rete a Livello 2, qualsiasi inefficienza nel codice si tradurrebbe in latenza per l'utente finale o, nel caso peggiore, in perdita di pacchetti legittimi (packet loss) e interruzione del servizio.
+    La validazione di un sistema di sicurezza di rete come il \textit{Dynamic ARP Inspection} (DAI) non può limitarsi alla sola verifica funzionale della correttezza logica (i.e., il blocco di un pacchetto malevolo), ma deve necessariamente includere un'analisi quantitativa delle prestazioni. Essendo il DAI un componente che opera in linea sul traffico di rete a Livello 2, qualsiasi inefficienza nel codice si tradurrebbe in latenza per l'utente finale o, nel caso peggiore, in perdita di pacchetti legittimi e interruzione del servizio.
     
     Per valutare l'efficacia e l'efficienza della soluzione Open Source proposta, sono state definite quattro metriche fondamentali. Queste misurazioni ci permettono di quantificare il comportamento del sistema sotto diversi profili di carico e di confrontare oggettivamente le diverse configurazioni architetturali (Single-Thread vs Multi-Thread).
     
     Di seguito vengono formalizzate le metriche utilizzate e il loro significato nel contesto del progetto.
     
-        \subsection{Latenza di Elaborazione (Processing Latency)}
+        \subsection{Latenza di Elaborazione}
         La latenza di elaborazione, misurata in microsecondi ($\mu s$), rappresenta l'intervallo di tempo che intercorre tra l'istante in cui un pacchetto ARP viene catturato dal thread ricevitore e l'istante in cui il sistema emette un verdetto (legittimo o malevolo) al termine dell'analisi.
         
         Formalmente, per ogni pacchetto $p$, la latenza $L_p$ è calcolata come:
@@ -18,17 +19,17 @@
         
         \textbf{Significato nel contesto:} Questa metrica è il principale indicatore della reattività del sistema ("Real-Time"). Poiché il protocollo ARP è bloccante per la comunicazione IP successiva, un valore elevato di latenza introdurrebbe ritardi nell'instaurazione delle connessioni di rete. L'obiettivo è minimizzare $L_p$ affinché l'ispezione risulti trasparente all'utente. Nei grafici successivi, analizzeremo sia la latenza media che i picchi di latenza per valutare la stabilità sotto stress.
         
-        \subsection{Throughput Sostenibile (Packets Per Second - PPS)}
+        \subsection{Throughput Sostenibile}
         Il Throughput indica la capacità del sistema di processare una data mole di traffico nell'unità di tempo. Viene misurato in Pacchetti Per Secondo (PPS).
         
         Questa metrica viene calcolata dal modulo di monitoraggio campionando il numero di pacchetti processati $\Delta N$ in un intervallo di tempo $\Delta t$:
         \[ PPS = \frac{\Delta N}{\Delta t} \]
         
-        \textbf{Significato nel contesto:} Questa metrica misura la "potenza bruta" del motore di ispezione ed è fondamentale per valutare la scalabilità. Durante un attacco di tipo \textit{ARP Flood} o in presenza di picchi di traffico broadcast legittimo (es. tempeste di broadcast), il sistema deve essere in grado di sostenere un throughput elevato senza collassare. I test di carico mirano a individuare il punto di saturazione del sistema, ovvero il numero massimo di PPS gestibili prima che si verifichi un degrado delle prestazioni.
+        \textbf{Significato nel contesto:} Questa metrica misura la "potenza bruta" del motore di ispezione ed è fondamentale per valutare la scalabilità. Durante un attacco di tipo \textit{ARP Flood} o in presenza di picchi di traffico broadcast legittimo, il sistema deve essere in grado di sostenere un throughput elevato senza collassare. I test di carico mirano a individuare il punto di saturazione del sistema, ovvero il numero massimo di PPS gestibili prima che si verifichi un degrado delle prestazioni.
         
-        \subsection{Occupazione della Coda (Queue Load Saturation)}
+        \subsection{Occupazione della Coda}
         Questa metrica percentuale misura il livello di riempimento del buffer circolare condiviso tra il thread produttore (Receiver) e i thread consumatori (Analyzers).
-        Dato che il campionamento periodico potrebbe non catturare picchi istantanei di riempimento, il software è stato strumentato per registrare il \textbf{Picco di Occupazione} (\textit{Peak Queue Load}) raggiunto nell'intervallo di campionamento.
+        Dato che il campionamento periodico potrebbe non catturare picchi istantanei di riempimento, il software è stato strumentato per registrare il Picco di Occupazione (\textit{Peak Queue Load}) raggiunto nell'intervallo di campionamento.
         
         \[ Q_{\%} = \left( \frac{Count_{max}}{Size_{queue}} \right) \times 100 \]
         
@@ -39,17 +40,18 @@
         \end{itemize}
         L'analisi di questa metrica sarà determinante per dimostrare i vantaggi del passaggio da un'architettura Single-Thread a una Multi-Thread.
         
-        \subsection{Accuratezza del Rilevamento (Detection Rate)}
+        \subsection{Accuratezza del Rilevamento}
         Rappresenta la capacità funzionale del sistema di distinguere correttamente tra traffico lecito e illecito. Viene misurata confrontando il numero di attacchi iniettati durante la simulazione con il numero di alert registrati dal sistema nel contatore \texttt{AttacksTotal}.
         
-        \textbf{Significato nel contesto:} Oltre alle prestazioni velocistiche, è imperativo che il sistema garantisca la sicurezza. In scenari di stress (es. Denial of Service), è cruciale verificare che il sistema non vada in "fail-open" (lasciando passare attacchi) né scarti traffico legittimo a causa del sovraccarico. Questa metrica confermerà la robustezza della logica di validazione anche in condizioni critiche.
+        \textbf{Significato nel contesto:} Oltre alle prestazioni velocistiche, è imperativo che il sistema garantisca la sicurezza. In scenari di stress (es. Denial of Service), è cruciale verificare che il sistema non lasci passare attacchi né che scarti traffico legittimo a causa del sovraccarico. Questa metrica confermerà la robustezza della logica di validazione anche in condizioni critiche.
     
         
 
     \section{Strumentazione Integrata nel Software per il Testing}
+    \label{cap:strumentaz_testing}
 
-    Per ottenere le metriche definite nella sezione 6.1 senza alterare significativamente le prestazioni del sistema (riducendo al minimo l'effetto osservatore), è stato necessario "attrezzare" il codice sorgente.
-    L'approccio adottato consiste nell'introduzione di strumenti di misurazione a basso livello e nell'implementazione di un thread dedicato esclusivamente alla raccolta e alla persistenza dei dati statistici su file CSV. Viene prediletto tale formato di file per la raccolta di dati in un formato facilmente integrabile in diagrammi e infografica.
+    Per ottenere le metriche definite nella sezione \ref{sez:criteri_obbiettivi} senza alterare significativamente le prestazioni del sistema è stato necessario "attrezzare" il codice sorgente.
+    L'approccio adottato consiste nell'introduzione di strumenti di misurazione a basso livello e nell'implementazione di un thread dedicato esclusivamente alla raccolta e alla memorizzazione dei dati statistici su file CSV. Viene prediletto tale formato di file per la raccolta di dati in un formato facilmente integrabile in diagrammi e infografica.
     
     Di seguito vengono descritti i moduli implementativi introdotti per il testing.
         
@@ -191,9 +193,9 @@
         
         Gli scenari sono stati concepiti per rispondere a specifici quesiti di ricerca:
         \begin{itemize}
-            \item \textbf{Gruppo 1 (1.a/1.b):} Serve a stabilire la \textit{baseline} delle prestazioni. Utilizzando un solo thread, ci aspettiamo di evidenziare i limiti fisici dell'elaborazione sequenziale e il fenomeno della saturazione della coda.
-            \item \textbf{Gruppo 2 (2.a/2.b):} Introduce il parallelismo. Confrontando questi risultati con il Gruppo 1, si mira a quantificare il guadagno prestazionale (speedup) e la riduzione della latenza garantita dall'architettura Produttore-Consumatore.
-            \item \textbf{Gruppo 3 (3.a/3.b/3.c):} Simula un ambiente reale e ostile. Qui si valuta la capacità del sistema di gestire interfacce multiple e la sua resilienza (robustezza) quando una parte della rete è sotto attacco Denial of Service (DoS), verificando che il servizio sulle altre interfacce non venga interrotto.
+            \item \textbf{Gruppo 1 (1.a/1.b):} Serve a introdurre la discussione sulle prestazioni. Utilizzando un solo thread, ci aspettiamo di evidenziare i limiti fisici dell'elaborazione sequenziale e il fenomeno della saturazione della coda.
+            \item \textbf{Gruppo 2 (2.a/2.b):} Introduce il parallelismo. Confrontando questi risultati con il Gruppo 1, si mira a quantificare il guadagno prestazionale e la riduzione della latenza garantita dall'architettura Produttore-Consumatore.
+            \item \textbf{Gruppo 3 (3.a/3.b/3.c):} Simula un ambiente reale e ostile. Qui si valuta la capacità del sistema di gestire interfacce multiple e la sua resilienza quando una parte della rete è sotto attacco Denial of Service (\textit{DoS}), verificando che il servizio sulle altre interfacce non venga interrotto.
         \end{itemize}
         
         \begin{table}[H]
@@ -237,7 +239,7 @@
             \item \textbf{Configurazione Ottimizzata (Queue Size = 10000):} Una dimensione maggiorata (10x), scelta per analizzare se un buffer più ampio possa mitigare i limiti di elaborazione del Single-Thread o se, al contrario, introduca solo latenza aggiuntiva (fenomeno noto come \textit{Bufferbloat}\footnote{Il \textit{Bufferbloat} è un fenomeno di congestione causato dall'eccessivo dimensionamento dei buffer nei dispositivi di rete. Quando il tasso di arrivo dei pacchetti supera la capacità di elaborazione, un buffer troppo ampio tende ad accumulare una grande quantità di dati in coda anziché scartare l'eccesso. Questo comportamento previene il packet loss immediato ma introduce una latenza elevata e variabile (jitter), degradando le prestazioni delle comunicazioni, specialmente quelle in tempo reale.}).
         \end{enumerate}
         
-        Nelle sezioni successive, verranno presentate le evidenze empiriche raccolte tramite la strumentazione software descritta in 6.2, mettendo a confronto le metriche di throughput, latenza e occupazione della coda per ogni scenario.
+        Nelle sezioni successive, verranno presentate le evidenze empiriche raccolte tramite la strumentazione software descritta nel Capitolo \ref{cap:strumentaz_testing}, mettendo a confronto le metriche di throughput, latenza e occupazione della coda per ogni scenario.
 
     \section{Testing}
 
