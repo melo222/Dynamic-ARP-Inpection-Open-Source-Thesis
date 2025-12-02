@@ -11,7 +11,7 @@
     Di seguito vengono formalizzate le metriche utilizzate e il loro significato nel contesto del progetto.
     
         \subsection{Latenza di Elaborazione}
-        La latenza di elaborazione, misurata in microsecondi ($\mu s$), rappresenta l'intervallo di tempo che intercorre tra l'istante in cui un pacchetto ARP viene catturato dal thread ricevitore e l'istante in cui il sistema emette un verdetto (legittimo o malevolo) al termine dell'analisi.
+        La latenza di elaborazione, misurata in microsecondi (\textbf{$\boldsymbol{\mu}$s}), rappresenta l'intervallo di tempo che intercorre tra l'istante in cui un pacchetto ARP viene catturato dal thread ricevitore e l'istante in cui il sistema emette un verdetto (legittimo o malevolo) al termine dell'analisi.
         
         Formalmente, per ogni pacchetto $p$, la latenza $L_p$ è calcolata come:
         \[ L_p = T_{out} - T_{in} \]
@@ -334,7 +334,7 @@
             I risultati ottenuti (Figura \ref{fig:2a}) mostrano un comportamento radicalmente diverso rispetto allo scenario a singolo thread.
 
             A fronte delle stesse ondate di traffico in ingresso, l'occupazione della coda (grafico rosso) rimane prossima allo \textbf{0,1\%}. I quattro thread lavorano in sinergia smaltendo i pacchetti quasi istantaneamente, impedendo l'accumulo nel buffer.
-            Il dato più significativo riguarda la latenza media (grafico viola), che crolla dai valori millimetrici del test precedente a circa \textbf{13-15 $\mu$s}. Si tratta di una riduzione di due ordini di grandezza (circa 100 volte più veloce), che rende il processo di ispezione trasparente e privo di impatti percepibili sulla rete.
+            Il dato più significativo riguarda la latenza media (grafico viola), che crolla dai valori millimetrici del test precedente a circa \textbf{13-15 $\boldsymbol{\mu}$s}. Si tratta di una riduzione di due ordini di grandezza (circa 100 volte più veloce), che rende il processo di ispezione trasparente e privo di impatti percepibili sulla rete.
 
             \begin{figure}[H]
                 \centering
@@ -354,7 +354,7 @@
                 \label{fig:2b}
             \end{figure}
 
-            Il grafico evidenzia come la linea degli attacchi rilevati (verde) cresca linearmente e senza interruzioni fino al totale previsto, mentre la latenza rimane ancorata ai minimi di (\textbf{$\sim$6-7 $\mu$s}). L'assenza di saturazione della coda garantisce che nessun pacchetto venga scartato all'ingresso, assicurando una copertura di sicurezza del 100\% anche durante tentativi di \textit{Flooding Attack}.
+            Il grafico evidenzia come la linea degli attacchi rilevati (verde) cresca linearmente e senza interruzioni fino al totale previsto, mentre la latenza rimane ancorata ai minimi di (\textbf{$\sim$6-7 $\boldsymbol{\mu}$s}). L'assenza di saturazione della coda garantisce che nessun pacchetto venga scartato all'ingresso, assicurando una copertura di sicurezza del 100\% anche durante tentativi di \textit{Flooding Attack}.
 
 % ----------------- Dimensione Coda Maggiore --------------------
 
@@ -377,7 +377,7 @@
             \end{figure}
 
             Come mostrato nelle Figure \ref{fig:2a10} e \ref{fig:2b10}, sebbene la capacità del buffer sia decuplicata, il picco di riempimento non supera mai il \textbf{9-17\%}.
-            A differenza dello scenario 1.a (dove la coda lunga causava latenze di 6 ms), qui la latenza media rimane eccellente (\textbf{$\sim$23 $\mu$s} per il traffico legittimo e addirittura \textbf{$\sim$6.5 $\mu$s} sotto attacco).
+            A differenza dello scenario 1.a (dove la coda lunga causava latenze di 6 ms), qui la latenza media rimane eccellente (\textbf{$\sim$23 $\boldsymbol{\mu}$s} per il traffico legittimo e addirittura \textbf{$\sim$6.5 $\boldsymbol{\mu}$s} sotto attacco).
 
             Ciò dimostra che, in un'architettura ben parallelizzata, l'aumento della memoria non introduce \textit{Bufferbloat}: i thread consumatori sono sufficientemente veloci da svuotare la coda prima che si crei un arretrato significativo. Di conseguenza, un buffer di grandi dimensioni in questo contesto agisce puramente come margine di sicurezza per ondate di traffico eccezionali, senza controindicazioni sulle prestazioni.
 
@@ -394,7 +394,7 @@
             In questo scenario, la Rete 1 è soggetta a un pesante carico di traffico legittimo (50k flood), mentre sulla Rete 2 viene iniettato un breve attacco mirato (1k pacchetti spoofed).
 
             Il grafico in Figura \ref{fig:3a} dimostra la perfetta capacità di discriminazione del sistema. È possibile osservare come il throughput legittimo (linea blu) fluisca costantemente, mentre l'evento di attacco (visibile come un gradino netto nella linea verde degli attacchi rilevati) viene intercettato e bloccato istantaneamente.
-            Nonostante la contemporaneità degli eventi, la latenza media rimane contenuta entro i \textbf{19 $\mu$s}, confermando che l'attività malevola su un'interfaccia non degrada le prestazioni globali del router.
+            Nonostante la contemporaneità degli eventi, la latenza media rimane contenuta entro i \textbf{19 $\boldsymbol{\mu}$s}, confermando che l'attività malevola su un'interfaccia non degrada le prestazioni globali del router.
 
             \begin{figure}[H]
                 \centering
@@ -455,7 +455,7 @@
 
             L'aumento della coda a 10 mila slot permette di contenere tutte le ondate di pacchetti con agilità, occupando al massimo il \textbf{17,24\%}.
 
-            In questo contesto estremo, si osserva un fisiologico aumento della latenza media (\textbf{$\sim$270 $\mu$s}), imputabile alla contesa dei \textit{lock} tra i due thread ricevitori e i quattro analizzatori che accedono contemporaneamente alla coda condivisa.
+            In questo contesto estremo, si osserva un fisiologico aumento della latenza media (\textbf{$\sim$270 $\boldsymbol{\mu}$s}), imputabile alla contesa dei \textit{lock} tra i due thread ricevitori e i quattro analizzatori che accedono contemporaneamente alla coda condivisa.
 
             Tuttavia, il sistema mantiene la stabilità operativa, processando correttamente il 100\% del carico (50k attacchi bloccati e 50k pacchetti leciti inoltrati) senza perdite.
 
@@ -469,7 +469,7 @@
     \begin{itemize}
         \item \textbf{Il Limite del Single-Thread:} L'elaborazione su singolo thread si è dimostrata insufficiente per gestire ondate (\textit{burst}) di traffico ad alta intensità. In tutti gli scenari di stress (1.a/1.b), la coda ha raggiunto sistematicamente la saturazione (\textbf{100\%}), introducendo latenze nell'ordine dei millisecondi ($\sim$1-4 ms) e rischiando la perdita di pacchetti a livello di kernel. L'aumento della dimensione della coda (Tuning a 10k) ha mitigato la saturazione ma ha aggravato la latenza media, confermando la presenza di un collo di bottiglia computazionale e non di memoria.
         
-        \item \textbf{L'Efficacia del Multi-Threading:} Il passaggio a un pool di 4 thread analizzatori ha eliminato radicalmente il collo di bottiglia. La latenza media è crollata da valori millimetrici a circa \textbf{14 $\mu$s} (un miglioramento di oltre due ordini di grandezza), garantendo prestazioni \textit{Real-Time}. La capacità di smaltimento parallelo ha mantenuto la coda quasi vuota ($<1\%$) nella maggior parte degli scenari, trasformando il buffer da "parcheggio critico" a semplice area di transito.
+        \item \textbf{L'Efficacia del Multi-Threading:} Il passaggio a un pool di 4 thread analizzatori ha eliminato radicalmente il collo di bottiglia. La latenza media è crollata da valori millimetrici a circa \textbf{14 $\boldsymbol{\mu}$s} (un miglioramento di oltre due ordini di grandezza), garantendo prestazioni \textit{Real-Time}. La capacità di smaltimento parallelo ha mantenuto la coda quasi vuota ($<1\%$) nella maggior parte degli scenari, trasformando il buffer da "parcheggio critico" a semplice area di transito.
         
         \item \textbf{Resilienza e Isolamento:} I test in ambiente Multi-LAN (3.b/3.c) hanno dimostrato che l'architettura è in grado di isolare i flussi di traffico. Anche sotto un attacco Denial of Service massiccio (50.000 pacchetti malevoli), il sistema ha preservato l'integrità del traffico legittimo concorrente, processando il 100\% dei pacchetti validi senza perdite.
     \end{itemize}

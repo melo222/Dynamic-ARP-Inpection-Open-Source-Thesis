@@ -10,7 +10,7 @@ In quest'ultimo capitolo viene conclusa la panoramica attorno al progetto della 
 
         \subsubsection*{Scalabilità e Architettura Multi-Thread}
             La campagna di testing ha evidenziato in modo inequivocabile la superiorità dell'architettura parallela basata sul modello Produttore-Consumatore rispetto all'approccio sequenziale classico.
-            Mentre l'implementazione a singolo thread ha mostrato evidenti limiti di saturazione (Queue Load al 100\%) e latenze nell'ordine dei millisecondi già con carichi di 17.000 PPS, la configurazione multi-thread (4 analizzatori) ha permesso di abbattere la latenza di validazione di circa due ordini di grandezza, stabilizzandola intorno ai \textbf{10-15 $\mu$s}. Questo risultato conferma che l'ispezione del traffico in \textit{user-space}, se adeguatamente parallelizzata, può avvenire in tempo reale senza introdurre ritardi percepibili dagli utenti.
+            Mentre l'implementazione a singolo thread ha mostrato evidenti limiti di saturazione (Queue Load al 100\%) e latenze nell'ordine dei millisecondi già con carichi di 17.000 PPS, la configurazione multi-thread (4 analizzatori) ha permesso di abbattere la latenza di validazione di circa due ordini di grandezza, stabilizzandola intorno ai \textbf{10-15 $\boldsymbol{\mu}$s}. Questo risultato conferma che l'ispezione del traffico in \textit{user-space}, se adeguatamente parallelizzata, può avvenire in tempo reale senza introdurre ritardi percepibili dagli utenti.
 
         \subsubsection*{Robustezza e Resilienza al Denial of Service}
             Un traguardo significativo è la dimostrazione della resilienza del sistema in condizioni critiche. I test di resistenza al DoS hanno provato che, anche quando una parte della rete è soggetta a un attacco massiccio (50.000 PPS) che tenta di saturare le risorse, il traffico legittimo concorrente viene comunque processato e inoltrato. Grazie al tuning della coda (\textit{Queue Size} a 10.000) e alla velocità di smaltimento dei thread, il sistema evita il fenomeno del \textit{packet loss} indiscriminato, garantendo la continuità del servizio (\textit{Availability}) anche sotto assedio.
@@ -39,102 +39,107 @@ In quest'ultimo capitolo viene conclusa la panoramica attorno al progetto della 
             Questa limitazione viene gestita staticamente caricando le eccezioni in memoria prima dell'avvio dell'applicativo, operazione strettamente necessaria solo per via di questa limitazione ma in caso di effettiva integrazione in componenti livello 2 managed bisognerebbe aggiornare questa gestione in via eccezionale.
 
 
-\section{Il Futuro}
+    \section{Ipotesi di Miglioramento}
 
-In questa sezione finale si discutono le prospettive evolutive del progetto \textit{Dynamic ARP Inspection Open Source}. Partendo dalla solida base architetturale validata dai test, vengono proposte linee di sviluppo per l'ottimizzazione del codice, l'espansione delle funzionalità e l'integrazione in topologie di rete complesse.
+    In questa sezione finale si discutono le ipotesi evolutive del progetto \textit{Dynamic ARP Inspection Open Source}. Partendo dalla solida base architetturale validata dai test, vengono proposte linee di sviluppo per l'ottimizzazione del codice, l'espansione delle funzionalità e l'integrazione in topologie di rete complesse.
 
-    \subsection{Miglioramenti Attualmente Praticabili}
+        \subsection{Miglioramenti Attualmente Praticabili}
 
-    Questa categoria include ottimizzazioni implementabili direttamente sull'attuale codebase per migliorarne l'efficienza e la capacità diagnostica.
+        Questa categoria include ottimizzazioni implementabili direttamente sull'attuale codebase per migliorarne l'efficienza e la capacità diagnostica.
 
-        \subsubsection{Attività di Log Completa e Granulare}
-        Attualmente, il sistema produce un log aggregato globale. Un'evoluzione necessaria per l'impiego in produzione è l'implementazione del \textbf{Log-by-Network} (o \textit{Log-by-Interface}).
-        
-        Questa funzionalità prevede la strutturazione dei file di log in modo gerarchico o separato per ogni interfaccia monitorata (es. \texttt{dai\_log\_enp0s8.csv}, \texttt{dai\_log\_enp0s9.csv}).
-        Ciò permetterebbe agli amministratori di rete di isolare rapidamente l'origine di un attacco e di generare statistiche di carico specifiche per sottorete, migliorando notevolmente le capacità di \textit{network forensics} e troubleshooting. 
-        
-        \subsubsection{Integrazione con Protocollo Syslog}
-        Mentre il logging su file CSV locale è funzionale per le fasi di debug e testing in laboratorio, l'impiego in ambienti di produzione distribuiti richiede l'adozione di standard industriali per la gestione degli eventi. Un miglioramento implementativo cruciale è il supporto nativo al protocollo \textbf{Syslog} (RFC 5424 \cite{rfc5424}).
-
-        L'evoluzione dal salvataggio su disco locale all'invio dei messaggi verso un server remoto (tramite socket UDP o TCP) apporterebbe tre vantaggi strategici fondamentali per una soluzione di sicurezza \textit{Enterprise}:
-
-        \begin{itemize}
-            \item \textbf{Centralizzazione del Monitoraggio:} In una rete segmentata in cui operano molteplici istanze del daemon DAI su diversi router o switch, Syslog permette di aggregare tutti gli allarmi in un unico \textit{Log Collector} centrale, eliminando la necessità di accedere singolarmente a ogni dispositivo per verificare lo stato della rete.
+            \subsubsection{Attività di Log Completa e Granulare}
+            Attualmente, il sistema produce un log aggregato globale. Un'evoluzione necessaria per l'impiego in produzione è l'implementazione del \textbf{Log-by-Network} (o \textit{Log-by-Interface}).
             
-            \item \textbf{Integrità Forense (Tamper Resistance):} In uno scenario di attacco in cui il router stesso venisse compromesso, l'attaccante avrebbe la possibilità di cancellare i file di log locali per eliminare le tracce della propria attività. Trasmettendo i log in tempo reale a un server remoto sicuro, si garantisce la persistenza delle evidenze (\textit{Non-Repudiation}) anche in caso di compromissione o guasto del nodo di rilevamento.
+            Questa funzionalità prevede la strutturazione dei file di log in modo gerarchico o separato per ogni interfaccia monitorata (es. \texttt{dai\_log\_enp0s8.csv}, \texttt{dai\_log\_enp0s9.csv}).
+            Ciò permetterebbe agli amministratori di rete di isolare rapidamente l'origine di un attacco e di generare statistiche di carico specifiche per sottorete, migliorando notevolmente le capacità di \textit{network forensics} e troubleshooting. 
             
-            \item \textbf{Interoperabilità con sistemi SIEM:} L'adozione di un formato standard renderebbe il DAI immediatamente compatibile con le piattaforme SIEM (\textit{Security Information and Event Management}). Questo permetterebbe di correlare automaticamente gli eventi di ARP Spoofing con altri allarmi di sicurezza (es. traffico anomalo sul Firewall), innescando risposte automatiche coordinate.
-        \end{itemize}
+            \subsubsection{Integrazione con Protocollo Syslog}
+            Mentre il logging su file CSV locale è funzionale per le fasi di debug e testing in laboratorio, l'impiego in ambienti di produzione distribuiti richiede l'adozione di standard industriali per la gestione degli eventi. Un miglioramento implementativo cruciale è il supporto nativo al protocollo \textbf{Syslog} (RFC 5424 \cite{rfc5424}).
 
-        \subsubsection{Prestazioni e Strutture Dati}
-        Come analizzato nel capitolo relativo all'implementazione, l'attuale meccanismo di validazione si basa su una ricerca sequenziale all'interno di un array dinamico. Sebbene efficace per reti di dimensioni contenute, questa soluzione presenta una complessità computazionale lineare $O(n)$.
+            L'evoluzione dal salvataggio su disco locale all'invio dei messaggi verso un server remoto (tramite socket UDP o TCP) apporterebbe tre vantaggi strategici fondamentali per una soluzione di sicurezza \textit{Enterprise}:
 
-        Una potenziale ottimizzazione architetturale per mitigare questa complessità, senza alterare il modello multi-thread, consisterebbe nella sostituzione della struttura dati sottostante con una \textbf{Tabella Hash} (Hash Map). Utilizzando l'indirizzo IP come chiave di hashing per la ricerca (o, più robustamente, una pair $\langle IP, MAC \rangle$), la complessità della ricerca nel caso medio si ridurrebbe drasticamente a $O(1)$, ovvero a tempo costante. 
+            \begin{itemize}
+                \item \textbf{Centralizzazione del Monitoraggio:} In una rete segmentata in cui operano molteplici istanze del daemon DAI su diversi router o switch, Syslog permette di aggregare tutti gli allarmi in un unico \textit{Log Collector} centrale, eliminando la necessità di accedere singolarmente a ogni dispositivo per verificare lo stato della rete.
+                
+                \item \textbf{Integrità Forense (Tamper Resistance):} In uno scenario di attacco in cui il router stesso venisse compromesso, l'attaccante avrebbe la possibilità di cancellare i file di log locali per eliminare le tracce della propria attività. Trasmettendo i log in tempo reale a un server remoto sicuro, si garantisce la persistenza delle evidenze (\textit{Non-Repudiation}) anche in caso di compromissione o guasto del nodo di rilevamento.
+                
+                \item \textbf{Interoperabilità con sistemi SIEM:} L'adozione di un formato standard renderebbe il DAI immediatamente compatibile con le piattaforme SIEM (\textit{Security Information and Event Management}). Questo permetterebbe di correlare automaticamente gli eventi di ARP Spoofing con altri allarmi di sicurezza (es. traffico anomalo sul Firewall), innescando risposte automatiche coordinate.
+            \end{itemize}
 
-        Questa modifica garantirebbe una lookup quasi istantanea indipendentemente dal numero di host connessi, aumentando significativamente la scalabilità del modulo di validazione verso reti con migliaia di client, a fronte di un lieve aumento della complessità nell'implementazione della funzione di aggiornamento e nella gestione delle collisioni di hash.
+            \subsubsection{Prestazioni e Strutture Dati}
+            Come analizzato nel capitolo relativo all'implementazione, l'attuale meccanismo di validazione si basa su una ricerca sequenziale all'interno di un array dinamico. Sebbene efficace per reti di dimensioni contenute, questa soluzione presenta una complessità computazionale lineare $O(n)$.
 
-    \subsection{Funzionalità Sostanziali}
+            Una potenziale ottimizzazione architetturale per mitigare questa complessità, senza alterare il modello multi-thread, consisterebbe nella sostituzione della struttura dati sottostante con una \textbf{Tabella Hash} (Hash Map). Utilizzando l'indirizzo IP come chiave di hashing per la ricerca (o, più robustamente, una pair $\langle IP, MAC \rangle$), la complessità della ricerca nel caso medio si ridurrebbe drasticamente a $O(1)$, ovvero a tempo costante. 
 
-    In questa sezione vengono proposte funzionalità che estendono il perimetro d'azione del software per superare le limitazioni topologiche attuali.
+            Questa modifica garantirebbe una lookup quasi istantanea indipendentemente dal numero di host connessi, aumentando significativamente la scalabilità del modulo di validazione verso reti con migliaia di client, a fronte di un lieve aumento della complessità nell'implementazione della funzione di aggiornamento e nella gestione delle collisioni di hash.
 
-        \subsubsection*{Funzionamento in assenza di DHCP Server Locale}
-        Per superare la dipendenza dal file di lease locale, il progetto dovrebbe evolvere verso un'architettura ibrida capace di popolare la \textit{binding table} tramite fonti esterne.
-        Le soluzioni prospettate sono due:
+        \subsection{Funzionalità Sostanziali}
 
+        In questa sezione vengono proposte funzionalità che estendono il perimetro d'azione del software per superare le limitazioni topologiche attuali.
+
+            \subsubsection*{Funzionamento in assenza di DHCP Server Locale}
+            Per superare la dipendenza dal file di lease locale, il progetto dovrebbe evolvere verso un'architettura ibrida capace di popolare la \textit{binding table} tramite fonti esterne.
+            Le soluzioni prospettate sono due:
+
+            \begin{itemize}
+                \item \textbf{DHCP Snooping Passivo:} Implementare un modulo "sniffer" dedicato che intercetta i pacchetti \texttt{DHCP ACK} transitanti sulla rete (anche se generati da server remoti) per costruire dinamicamente il database delle associazioni fidate, replicando il comportamento degli switch hardware.
+                \item \textbf{Sincronizzazione Remota:} Sviluppare un'API per interrogare database centralizzati o rendere i file di lease condivisi via rete, permettendo al DAI di operare su nodi di rete che non svolgono funzioni di DHCP server.
+            \end{itemize}
+
+            \subsubsection*{Packet Rate Limiting e Protezione DoS}
+            Sebbene i test abbiano dimostrato che il DAI è in grado di reggere carichi elevatissimi (oltre 34k PPS), l'introduzione di un meccanismo di \textit{Rate Limiting} rimane una \textit{best practice} di sicurezza.
+            Implementare un algoritmo di \textit{Token Bucket} per limitare il numero di pacchetti ARP accettati per secondo da uno specifico MAC address o interfaccia servirebbe a:
+
+            \begin{itemize}
+                \item Prevenire il sovraccarico della CPU in scenari ancora più estremi di quelli testati.
+                \item Isolare automaticamente host compromessi che generano flood, evitando che il "rumore" del traffico inutile si propaghi sulla rete, proteggendo non solo il router DAI ma anche gli altri host del dominio di broadcast.
+            \end{itemize}
+
+        \subsection{Evoluzione Complessiva}
+
+        Infine, si discute l'evoluzione del software da strumento di rilevamento passivo a sistema di prevenzione attiva.
+
+            \subsubsection{Passaggio da IDS a IPS (Intrusion Prevention System)}
+            L'attuale implementazione agisce principalmente come un IDS (\textit{Intrusion Detection System}), rilevando l'attacco ma senza bloccare fisicamente il pacchetto a livello kernel prima che venga inoltrato (sebbene l'architettura lo permetta teoricamente).
+            Per trasformare il sistema in un IPS puro, si possono percorrere due strade:
+
+            \begin{enumerate}
+                \item \textbf{In-Line Blocking (Netfilter):} Integrare il software con le code di \textit{Netfilter} (NFQUEUE) per intercettare i pacchetti in user-space, decidere il verdetto (ACCEPT/DROP) e comunicarlo al kernel. Questo approccio garantisce il blocco preventivo ma introduce una latenza inevitabile per ogni pacchetto.
+                
+                \item \textbf{Active Remediation (Gratuitous ARP):} Un approccio alternativo, che non introduce latenza sul traffico legittimo, consiste nel non bloccare il pacchetto sospetto in attesa di analisi, ma reagire "a posteriori" in tempo reale. \\
+                Alla ricezione di un pacchetto malevolo, si opera per "immobilizzare" il MAC mittente, bloccando il suo traffico e limitando i danni in corso. I destinatari di tali pacchetti, vittime di un avvelenamento delle proprie tabelle ARP, devono essere ripristinati allo stato antecedente l'attacco.\\
+                Il sistema invia immediatamente un \textbf{Gratuitous ARP Reply} correttivo unicast alle vittime. Questo pacchetto "curativo" sovrascrive immediatamente l'entry avvelenata nella cache delle vittime, annullando l'effetto dell'attacco man-in-the-middle in pochi millisecondi. Questa soluzione privilegia la continuità del servizio e la velocità, evitando colli di bottiglia sul traffico in transito.
+            \end{enumerate}
+
+    \section{Il Futuro della Dynamic ARP Inspection Open Source}
+    \label{sec:il_futuro}
+
+    L'analisi condotta in questo elaborato ha dimostrato non solo la fattibilità tecnica di una \textit{Dynamic ARP Inspection} (DAI) basata su software Open Source, ma ha anche evidenziato una lacuna significativa nel panorama attuale della sicurezza di rete. Il mercato odierno appare fortemente polarizzato: da un lato, le soluzioni \textit{Enterprise} (Cisco, Juniper) offrono strumenti di protezione sofisticati a fronte di costi elevati e hardware proprietario; dall'altro, il vasto mercato dei dispositivi \textit{Consumer} e SOHO (\textit{Small Office/Home Office}) lascia le reti locali sostanzialmente indifese contro minacce di livello 2 come l'ARP Spoofing.
+
+    In questo scenario, il futuro del progetto non risiede nella competizione diretta con i colossi del networking, bensì nell'occupazione strategica di quella fascia intermedia di utenza che necessita di protezione ma non possiede le risorse per accedere a soluzioni industriali.
+
+        \subsection{L'Ecosistema Tecnologico di Riferimento: Linux Embedded e OpenWrt}
+        La naturale evoluzione di questo prototipo è l'integrazione nell'ecosistema dei sistemi operativi per dispositivi embedded basati su Linux. Tra questi, \textbf{OpenWrt} rappresenta il candidato ideale per l'adozione della DAI Open Source.
+        Le ragioni di questa affinità sono molteplici e strutturali:
         \begin{itemize}
-            \item \textbf{DHCP Snooping Passivo:} Implementare un modulo "sniffer" dedicato che intercetta i pacchetti \texttt{DHCP ACK} transitanti sulla rete (anche se generati da server remoti) per costruire dinamicamente il database delle associazioni fidate, replicando il comportamento degli switch hardware.
-            \item \textbf{Sincronizzazione Remota:} Sviluppare un'API per interrogare database centralizzati o rendere i file di lease condivisi via rete, permettendo al DAI di operare su nodi di rete che non svolgono funzioni di DHCP server.
+            \item \textbf{Compatibilità Architetturale:} OpenWrt è una distribuzione Linux completa. Il daemon sviluppato in questa tesi, basato su librerie standard come \texttt{libpcap} e \texttt{pthread}, è intrinsecamente portabile su tale piattaforma con modifiche minime al codice sorgente.
+            \item \textbf{Sinergia con i Servizi Esistenti:} La validazione del traffico implementata nel progetto si basa sulla lettura dei lease di \textit{Dnsmasq}. Essendo quest'ultimo il server DHCP e DNS predefinito in OpenWrt, l'integrazione non richiederebbe l'installazione di dipendenze esterne o la riconfigurazione dei servizi di rete essenziali.
+            \item \textbf{Efficienza delle Risorse:} I test prestazionali hanno dimostrato che il modulo di ispezione opera con un'impronta di memoria estremamente ridotta (circa 0.5 MB per code di grandi dimensioni). Questa caratteristica è cruciale per i router domestici e gli access point, spesso dotati di quantitativi limitati di RAM (128-256 MB), dove soluzioni più pesanti risulterebbero inapplicabili.
         \end{itemize}
 
-        \subsubsection*{Packet Rate Limiting e Protezione DoS}
-        Sebbene i test abbiano dimostrato che il DAI è in grado di reggere carichi elevatissimi (oltre 34k PPS), l'introduzione di un meccanismo di \textit{Rate Limiting} rimane una \textit{best practice} di sicurezza.
-        Implementare un algoritmo di \textit{Token Bucket} per limitare il numero di pacchetti ARP accettati per secondo da uno specifico MAC address o interfaccia servirebbe a:
+        Tale integrazione trasformerebbe milioni di router economici, già presenti nelle case e negli uffici, in dispositivi di sicurezza attiva, in grado di neutralizzare attacchi \textit{Man-in-the-Middle} senza richiedere l'acquisto di nuovo hardware.
 
-        \begin{itemize}
-            \item Prevenire il sovraccarico della CPU in scenari ancora più estremi di quelli testati.
-            \item Isolare automaticamente host compromessi che generano flood, evitando che il "rumore" del traffico inutile si propaghi sulla rete, proteggendo non solo il router DAI ma anche gli altri host del dominio di broadcast.
-        \end{itemize}
-
-    \subsection{Evoluzione Complessiva}
-
-    Infine, si discute l'evoluzione del software da strumento di rilevamento passivo a sistema di prevenzione attiva.
-
-        \subsubsection{Passaggio da IDS a IPS (Intrusion Prevention System)}
-        L'attuale implementazione agisce principalmente come un IDS (\textit{Intrusion Detection System}), rilevando l'attacco ma senza bloccare fisicamente il pacchetto a livello kernel prima che venga inoltrato (sebbene l'architettura lo permetta teoricamente).
-        Per trasformare il sistema in un IPS puro, si possono percorrere due strade:
+        \subsection{Utenza di Riferimento e Impatto Sociale}
+        L'adozione di questa tecnologia si rivolgerebbe a tre macro-categorie di utenti, ciascuna con esigenze specifiche di sicurezza attualmente insoddisfatte:
 
         \begin{enumerate}
-            \item \textbf{In-Line Blocking (Netfilter):} Integrare il software con le code di \textit{Netfilter} (NFQUEUE) per intercettare i pacchetti in user-space, decidere il verdetto (ACCEPT/DROP) e comunicarlo al kernel. Questo approccio garantisce il blocco preventivo ma introduce una latenza inevitabile per ogni pacchetto.
+            \item \textbf{Utenza Esperta e Ambienti Domestici Evoluti:} Gli appassionati di tecnologia e i professionisti che gestiscono laboratori domestici (\textit{Home Lab}) rappresentano i primi adottatori naturali. Per questa categoria, la possibilità di implementare le stesse logiche di sicurezza presenti nei data center aziendali costituisce un valore aggiunto significativo.
             
-            \item \textbf{Active Remediation (Gratuitous ARP):} Un approccio alternativo, che non introduce latenza sul traffico legittimo, consiste nel non bloccare il pacchetto sospetto in attesa di analisi, ma reagire "a posteriori" in tempo reale. \\
-            Alla ricezione di un pacchetto malevolo, si opera per "immobilizzare" il MAC mittente, bloccando il suo traffico e limitando i danni in corso. I destinatari di tali pacchetti, vittime di un avvelenamento delle proprie tabelle ARP, devono essere ripristinati allo stato antecedente l'attacco.\\
-            Il sistema invia immediatamente un \textbf{Gratuitous ARP Reply} correttivo unicast alle vittime. Questo pacchetto "curativo" sovrascrive immediatamente l'entry avvelenata nella cache delle vittime, annullando l'effetto dell'attacco man-in-the-middle in pochi millisecondi. Questa soluzione privilegia la continuità del servizio e la velocità, evitando colli di bottiglia sul traffico in transito.
+            \item \textbf{Piccole e Medie Imprese (PMI) e Settore Retail:} Esercizi commerciali, spazi di coworking e piccoli uffici operano spesso con reti aperte o semi-pubbliche (es. Wi-Fi ospiti), dove il rischio di attacchi interni tra clienti connessi è elevato. La DAI Open Source offrirebbe a queste realtà una protezione essenziale per la privacy dei dati dei propri utenti, mitigando rischi legali e reputazionali a costo zero.
+            
+            \item \textbf{Reti Comunitarie e Paesi in Via di Sviluppo:} Progetti di connettività civica e infrastrutture in aree con risorse limitate fanno ampio affidamento su hardware di recupero o a basso costo. In questi contesti, dove la sicurezza viene spesso sacrificata per motivi di budget, una soluzione software leggera ed efficace rappresenta uno strumento di inclusione digitale sicura.
         \end{enumerate}
 
+        In conclusione, il futuro della \textit{Dynamic ARP Inspection Open Source} è quello di divenire una componente standard all'interno dei firmware comunitari. Il passaggio da un approccio proprietario e centralizzato a uno distribuito e aperto non solo democratizza l'accesso alla sicurezza, ma contribuisce a elevare il livello base di resilienza dell'intera infrastruttura di rete globale, proteggendo l'anello più debole della catena: l'utente finale.
 
-
-
-    % \section{Il Futuro}
-    % In tal occasione, si vuole discutere riguardo alle prospettive future del progetto \textit{Dynamic ARP Inspection Open Source} in ottica di miglioramento ed integrazione ottimale.
-    
-    %     \subsection{Miglioramenti Praticabili}
-
-    %         \subsubsection{Attività di Log Completa}
-    %         file di log e opzioni di log-by-network, ovvero logging delle attività per ogni rete coinvolta, così da avere una logica di report suddivisa per ogni rete.
-
-    %         \subsubsection{Prestazioni}
-    %         % paragrafo tolto nella spiegazione della ricerca nella tabella cache delle lease DHCP per alleggerire quella sezione, inoltre sarebbe meglio interirla in questi capitolo conclusivi e di argomentazione sul progetto.
-    %         Una potenziale ottimizzazione architetturale per mitigare questa complessità, senza alterare il modello multi-thread, consisterebbe nella sostituzione della struttura dati sottostante. Invece di un array dinamico, si potrebbe impiegare una struttura a Tabella Hash (Hash Map). Utilizzando l'indirizzo IP come chiave di hashing per la ricerca (o, più robustamente, una pair ⟨IP, MAC⟩), la complessità della ricerca nel caso medio si ridurrebbe drasticamente a $O(1)$, ovvero a tempo costante. Questa modifica garantirebbe una lookup quasi istantanea e aumenterebbe significativamente la scalabilità del modulo di validazione, a fronte di un lieve aumento della complessità nell'implementazione della funzione di update e nella gestione delle collisioni di hash. 
-
-    %     \subsection{Feature Sostanziali}
-
-    %         \subsubsection{Funzionamento in assenza del DHCP Server nel dispostivo Host del DAI Open Source}
-
-    %         \subsubsection{Packet Rate Limiting per ridurre il rischio di DoS}
-            
-        
-    %     \subsection{Apparati e Modalità Aggiuntive}
-
-    %         \subsubsection{Passaggio da IDS a IPS}
-    %         Implementare \texttt{DROP} delle ARP Reply dannose prima di ritrasmetterle nella rete. (primo approccio)
-    %         Oppure, senza dover avere uno (o N in caso di Flooding) pacchetto pendente durante un possibile traffico pesante in corso, si potrebbe bloccare la porta verso l'host malevolo e riparare con Gratuitous ARP Reply in base alla tabella delle Lease DHCP a tutti gli host per ripristinare le tabelle ARP potenzialmente compromesse. In questo modo non si ha latenza per i pacchetti pendenti in attesa di validazione. 
+\newpage
