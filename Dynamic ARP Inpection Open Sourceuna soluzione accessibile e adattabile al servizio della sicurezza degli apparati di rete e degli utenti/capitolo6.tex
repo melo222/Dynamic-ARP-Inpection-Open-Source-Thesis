@@ -242,7 +242,6 @@
         Nelle sezioni successive, verranno presentate le evidenze empiriche raccolte tramite la strumentazione software descritta nel Capitolo \ref{cap:strumentaz_testing}, mettendo a confronto le metriche di throughput, latenza e occupazione della coda per ogni scenario.
 
     \section{Testing}
-
     In questa sezione vengono presentati i risultati sperimentali ottenuti dall'esecuzione degli scenari pianificati. I dati esposti sono stati ricavati direttamente dai file di log in formato \texttt{CSV} generati dal modulo di monitoraggio interno (\texttt{monitor\_t}), garantendo un riscontro oggettivo basato su misurazioni ad alta frequenza (10 campioni al secondo). 
     
     Per ogni gruppo di test, verranno illustrati grafici che correlano il throughput di ingresso (PPS), l'occupazione della coda e la latenza di elaborazione, offrendo una visione completa del comportamento del sistema sotto stress. Negli scenari in cui è previsto un traffico malevolo, alle illustrazioni precedenti si aggiungerà quella dei pacchetti ricevuti e segnalati come malevoli.
@@ -255,7 +254,7 @@
 
         \subsection{Rete LAN Singola (scenario 1.a/b)}
 
-        In questo primo gruppo di test, il router DAI è stato configurato con un singolo thread di analisi e una coda standard (\texttt{ARP\_QUEUE\_SIZE = 1000}). Questo scenario rappresenta la \textit{baseline} per comprendere i limiti intrinseci dell'elaborazione sequenziale.
+        In questo primo gruppo di test, il router DAI è stato configurato con un singolo thread di analisi e una coda standard (\texttt{ARP\_QUEUE\_SIZE = 1000}). Questo scenario rappresenta il primo passo per comprendere i limiti intrinseci dell'elaborazione sequenziale.
         
 
             \subsubsection{Scenario 1.a: Traffico Legittimo (Baseline)}
@@ -321,7 +320,7 @@
                 \item \textbf{Fenomeno di \textit{Bufferbloat}:} Nonostante l'assenza di saturazione, la latenza di elaborazione non è migliorata, anzi, ha mostrato picchi fino a \textbf{6 ms}. Questo fenomeno conferma che aumentare la memoria impedisce la perdita di pacchetti all'ingresso (il Receiver non si blocca più), ma non velocizza l'elaborazione. I pacchetti si accumulano in una coda più lunga, aumentando il tempo di attesa medio prima di essere serviti dall'unico thread analizzatore disponibile.
             \end{itemize}
             
-            In conclusione, il tuning della coda risolve il problema del \textit{packet loss} ma non quello della latenza, che rimane vincolata alla capacità computazionale del singolo core.
+            In conclusione, il tuning della coda risolve il problema del  ma non quello della latenza, che rimane vincolata alla capacità computazionale del singolo core.
 
 
             % ------- GRUPPO DUE ---------------------------------------------
@@ -400,7 +399,7 @@
             \begin{figure}[H]
                 \centering
                 \includegraphics[width=0.9\textwidth]{immagini/testing_plot/3a.png}
-                \caption{Scenario 3.a: Gestione concorrente di traffico legittimo (Rete 1) e attacco (Rete 2).}
+                \caption{Scenario 3.a: Gestione concorrente di traffico legittimo (50k) e attacco (1k).}
                 \label{fig:3a}
             \end{figure}
 
@@ -409,7 +408,7 @@
 
             L'evidenza chiave emerge dal confronto tra il totale dei pacchetti processati (linea nera) e gli attacchi rilevati (linea verde).
             Sebbene la coda raggiunga momentaneamente la saturazione (\textbf{100\%}) a causa della violenza dell'attacco flood, il sistema non collassa. Al termine del test, il divario tra le due linee corrisponde esattamente ai \textbf{1.000 pacchetti legittimi} inviati.
-            Ciò dimostra che, anche in condizioni di saturazione parziale del buffer, l'architettura multi-thread è in grado di processare e salvare il traffico lecito, garantendo la continuità del servizio (\textit{Service Availability}) anche sotto assedio.
+            Ciò dimostra che, anche in condizioni di saturazione parziale del buffer, l'architettura multi-thread è in grado di processare e salvare il traffico lecito, garantendo la continuità del servizio anche sotto assedio.
 
             \begin{figure}[H]
                 \centering
@@ -422,24 +421,21 @@
 
             \subsubsection{Scenario 3.a e 3.b con Dimensione Coda Maggiore}
 
-            L'applicazione della coda maggiorata (10.000 slot) agli scenari Multi-LAN fornisce la conferma definitiva della validità del tuning.
+            L'applicazione della coda maggiorata (10.000 slot) agli scenari Multi-LAN fornisce la conferma definitiva della validità del maggioramento della coda.
 
-            Come evidenziato nella Figura \ref{fig:3b10}, nello scenario di resistenza al DoS, l'utilizzo della coda crolla dal 100\% (del test standard) a un mero \textbf{11.59\%}.
+            Come evidenziato nella Figura \ref{fig:3b10}, nello scenario di resistenza al DoS, l'utilizzo della coda crolla da picchi del 100\% a un massimo di \textbf{11.59\%}.
 
-            Ancora più sorprendente è il risultato dello stress test massimo (Figura \ref{fig:3c10}): anche con 100.000 pacchetti in ingresso simultaneo, il buffer non supera mai il \textbf{17.24\%} di occupazione.
-
-            Questo risultato sancisce che la configurazione \textbf{4 Thread + Coda 10k} rappresenta l'assetto ottimale per l'ambiente di produzione, capace di trasformare potenziali situazioni di disservizio (coda piena) in eventi di ordinaria gestione, mantenendo la latenza media sotto la soglia critica dei \textbf{10 $\mu$s} nella maggior parte degli scenari operativi.
             \begin{figure}[H]
                 \centering
                 \includegraphics[width=\textwidth]{immagini/testing_plot/3a10.png}
-                \caption{3.b (Coda 10k): DoS Resistance senza saturazione.}
+                \caption{Scenario 3.b (Coda 10k): Gestione concorrente di traffico legittimo (50k) e attacco (1k)}
                 \label{fig:3b10}
             \end{figure}
             
             \begin{figure}[H]
                 \centering
                 \includegraphics[width=\textwidth]{immagini/testing_plot/3b10.png}
-                \caption{3.c (Coda 10k): Heavy Load con coda al 17\%.}
+                \caption{Scenario 3.c (Coda 10k): Survival del traffico legittimo (1k) durante un DoS massiccio (50k).}
                 \label{fig:3c10}
             \end{figure}
 
@@ -457,12 +453,16 @@
                 \label{fig:3c}
             \end{figure}
 
-            In questo contesto estremo, si osserva un fisiologico aumento della latenza media (\textbf{$\sim$270 $\mu$s}), imputabile alla contesa (\textit{lock contention}) tra i due thread ricevitori e i quattro analizzatori che accedono contemporaneamente alla coda condivisa. Tuttavia, il sistema mantiene la stabilità operativa, processando correttamente il 100\% del carico (50k attacchi bloccati e 50k pacchetti leciti inoltrati) senza perdite.
+            L'aumento della coda a 10 mila slot permette di contenere tutte le ondate di pacchetti con agilità, occupando al massimo il \textbf{17,24\%}.
+
+            In questo contesto estremo, si osserva un fisiologico aumento della latenza media (\textbf{$\sim$270 $\mu$s}), imputabile alla contesa dei \textit{lock} tra i due thread ricevitori e i quattro analizzatori che accedono contemporaneamente alla coda condivisa.
+
+            Tuttavia, il sistema mantiene la stabilità operativa, processando correttamente il 100\% del carico (50k attacchi bloccati e 50k pacchetti leciti inoltrati) senza perdite.
 
 
     \section{Conclusioni sui Risultati Sperimentali}
 
-    L'ampia campagna di testing condotta ha permesso di caratterizzare il comportamento del sistema DAI Open Source sotto diversi profili di carico, evidenziando i limiti dell'approccio sequenziale e i benefici dell'architettura parallela.
+    L'ampia gamma di testing condotta ha permesso di caratterizzare il comportamento del sistema DAI Open Source sotto diversi profili di carico, evidenziando i limiti dell'approccio sequenziale e i benefici dell'architettura parallela.
 
     Dall'analisi incrociata delle metriche di throughput, latenza e occupazione della coda, emergono tre evidenze fondamentali:
 
