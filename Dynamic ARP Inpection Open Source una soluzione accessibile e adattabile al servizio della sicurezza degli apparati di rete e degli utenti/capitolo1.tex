@@ -24,11 +24,11 @@ Il cuore del lavoro verte sulla progettazione e lo sviluppo di un'architettura s
         \end{itemize}
     \end{itemize}
     
-    \begin{figure}
+    \begin{figure}[htbp]
         \centering
-        \includegraphics[width=0.5\linewidth]{immagini/OSI_Model_Italiano.jpg}
-        \caption{Modello ISO/OSI}
-        \label{fig:placeholder}
+        \includegraphics[width=0.6\linewidth]{immagini/OSI_Model_Italiano.jpg} 
+        \caption[Modello ISO/OSI]{Rappresentazione dei 7 livelli del modello ISO/OSI. (Fonte: Wikimedia Commons, CC BY-SA)}
+        \label{fig:osi_model}
     \end{figure}
     Il primo protocollo regola l'accesso al mezzo fisico trasmissivo tramite il quale più schede di rete possono comunicare usando l'omonimo indirizzo MAC, composto da 48 bit o 12 cifre esadecimali univocamente identificabili (es. 00:1A:2B:3C:4D:5E).
     L'indirizzo MAC è usato come indirizzo di origine e di destinazione all'interno del frame del Data Link. Lo switch legge l'indirizzo MAC di destinazione per sapere esattamente su quale porta inoltrare il frame, garantendo che i dati vengano consegnati solo al dispositivo corretto sulla rete locale.   
@@ -82,8 +82,30 @@ Il cuore del lavoro verte sulla progettazione e lo sviluppo di un'architettura s
     \section{I problemi di sicurezza del protocollo ARP}
     L'Address Resolution Protocol è notoriamente conosciuto per essere stato sviluppato senza schemi di autenticazione o verifica dei messaggi; la sua semplicità lo rende completamente privo di controlli di sicurezza e causa diverse vulnerabilità.
 
-    Il principale e più noto problema di sicurezza associato all'ARP è l'ARP Cache Poisoning (o ARP Spoofing). L'ARP Poisoning è una tecnica di attacco in cui l'attaccante sfrutta una fondamentale vulnerabilità del protocollo: il fatto che sia stateless, ovvero privo di stato di esecuzione, e non richieda autenticazione. Ciò comporta che il dispositivo aggiorni la sua cache ARP basandosi su qualsiasi messaggio ARP Reply ricevuto, anche se non ha mai inviato una richiesta ARP iniziale. 
-    
-    L'attacco consiste nell'invio di messaggi ARP Reply falsificati a uno o più dispositivi. Per sfruttare al meglio la vulnerabilità, l'attaccante invia un ARP Reply falsificato al Gateway, il router, affermando che l'indirizzo IP del client vittima corrisponde al MAC address dell'attaccante; al contempo, invia un secondo ARP Reply alla vittima, affermando che l'indirizzo IP del router corrisponde al MAC address dell'attaccante. Sia il router che il client aggiornano le proprie cache con le informazioni falsificate. La conseguenza diretta è l'attacco Man-in-the-Middle (MITM), in cui l'attaccante si interpone nel percorso di comunicazione. Tutto il traffico destinato a una delle due parti (client o router) viene inoltrato all'indirizzo MAC dell'attaccante, il quale può intercettare, monitorare e potenzialmente alterare i dati; per risultare invisibile agli occhi delle vittime, potrà poi inoltrare il traffico alle rispettive destinazioni.
+    Il principale e più noto problema di sicurezza associato all'ARP è l'\textit{ARP Cache Poisoning} (o ARP Spoofing). Questa tecnica di attacco sfrutta una fondamentale debolezza del protocollo: il fatto che sia \textit{stateless}, ovvero privo di stato, e non richieda autenticazione. Ciò comporta che un dispositivo aggiorni la propria cache ARP basandosi su qualsiasi messaggio ARP Reply ricevuto, accettandolo incondizionatamente anche se non ha mai inviato una richiesta ARP iniziale.
 
-    QUA FIGURA SCHEMA DI ATTACCO
+    L'attacco consiste nell'invio di messaggi ARP Reply falsificati a uno o più dispositivi presenti nella rete locale. Il funzionamento pratico è illustrato in dettaglio nella Figura \ref{fig:ARP_Cache_Poisoning}, che descrive l'evoluzione temporale dell'attacco attraverso tre fasi distinte.
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=\textwidth, height=0.929\textheight, keepaspectratio]{immagini/ARP Cache Poisoning.drawio.pdf}
+        \caption{Raffigurazione dell'attacco ARP Cache Poisoning: dal funzionamento normale (in alto) all'intercettazione MITM (in basso).}
+        \label{fig:ARP_Cache_Poisoning}
+    \end{figure}
+
+    \subsection*{Fase 1: Funzionamento Normale}
+    Nella parte superiore della figura è rappresentato lo stato legittimo della rete. Lo \textit{User 1} (192.168.1.10) comunica con lo \textit{User 2} (192.168.1.20) inviando pacchetti indirizzati al MAC address corretto del destinatario (\texttt{BB:...:BB}). Il traffico attraversa lo switch e raggiunge direttamente la destinazione prevista senza interferenze.
+
+    \subsection*{Fase 2: Avvelenamento (Poisoning)}
+    Nella parte centrale della figura avviene l'iniezione dei pacchetti malevoli. L'attaccante (\textit{HACKER}, 192.168.1.30) invia messaggi ARP Reply contraffatti a entrambe le vittime per corrompere le loro tabelle ARP:
+    \begin{itemize}
+        \item Allo \textit{User 1} viene comunicato che l'IP dello \textit{User 2} è associato al MAC dell'attaccante (\texttt{CC:...:CC}).
+        \item Allo \textit{User 2} viene comunicato che l'IP dello \textit{User 1} è associato al MAC dell'attaccante (\texttt{CC:...:CC}).
+    \end{itemize}
+
+    \subsection*{Fase 3: Man-in-the-Middle (MITM)}
+    La conseguenza dell'avvelenamento è visibile nella parte inferiore della figura. Quando lo \textit{User 1} tenta di inviare un nuovo pacchetto allo \textit{User 2}, utilizza l'associazione errata presente nella sua cache. Il frame ethernet viene quindi indirizzato al MAC \texttt{CC:...:CC} (come evidenziato nel pacchetto verde in basso a sinistra), portando lo switch a consegnare il dato all'attaccante anziché al destinatario reale.
+
+    L'attaccante riceve il dato, può analizzarlo o alterarlo, e successivamente lo inoltra al destinatario legittimo (pacchetto rosso verso \textit{User 2}), rendendo l'attacco trasparente agli occhi delle vittime che credono di comunicare direttamente tra loro.
+
+    Il verso della comunicazione può essere anche invertito con il traffico da \textit{User 2} a \textit{User 1}.
