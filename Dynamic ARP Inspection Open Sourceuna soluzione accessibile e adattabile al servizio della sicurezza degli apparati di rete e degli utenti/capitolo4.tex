@@ -1,0 +1,381 @@
+\chapter{Ambiente di Simulazione di Reti e di Sviluppo} \label{cap:ambiente_rete}
+Il capitolo presenta l'ambiente di sviluppo e virtualizzazione utilizzato per simulare, nel modo più fedele possibile, una rete demo composta inizialmente da un router e fino a quattro client, permettendo la scalabilità da scenario base (LAN singola) a scenario multi-rete.
+
+    \section{Obiettivi e Criteri di Progettazione}
+    L'allestimento dell'ambiente simulativo è stato guidato da due criteri metodologici primari: la fedeltà operativa e l'aderenza al paradigma Open Source. L'obiettivo principale era creare una piattaforma di testing che replicasse con la massima accuratezza possibile il contesto di una rete locale (LAN) gestita, dove i meccanismi di assegnazione dinamica degli indirizzi (DHCP) e la risoluzione degli indirizzi (ARP) siano attivi e vulnerabili.
+
+    In linea con la filosofia del progetto, la selezione degli strumenti di virtualizzazione e dei servizi di rete è stata orientata esclusivamente verso soluzioni Open Source. Questo assicura che l'intera catena di esecuzione, dal sistema operativo ai servizi di rete (DHCP/DNS) e all'isolamento (firewalling), sia completamente verificabile e riproducibile. Tale scelta non solo rafforza la coerenza del progetto con i principi di trasparenza, ma elimina ogni dipendenza da componenti proprietari che potrebbero alterare il comportamento dei protocolli o impedire l'analisi dettagliata del traffico a basso livello.
+    
+    Di conseguenza, le decisioni successive, che riguardano l'adozione di un hypervisor specifico, la selezione della distribuzione Linux e l'impiego di servizi DHCP e di Firewall, sono tutte subordinate al requisito di garantire un ambiente di sviluppo stabile, controllabile e replicabile da parte di qualsiasi soggetto esterno.
+    
+
+    \section{Ambiente Virtuale}
+    
+    Oracle VM VirtualBox è stato scelto come hypervisor di riferimento per la sua affidabilità e la sua architettura modulare, essenziale per la simulazione di reti complesse \cite{ardagna2015security}. Questo strumento consente l'avvio e la gestione simultanea di macchine virtuali basate su diverse distribuzioni guest e, fondamentale, offre il supporto nativo per la configurazione di molteplici schede di rete su ciascuna VM. Questa specifica funzionalità si è rivelata indispensabile, poiché ha permesso di assegnare all'entità simulante il router le interfacce virtuali necessarie a gestire la segmentazione e l'instradamento del traffico in reti logicamente separate.
+    
+    Inoltre, l'utilizzo di VirtualBox ha facilitato la configurazione di funzionalità di rete avanzate, quali l'Internal Networking e il NAT, garantendo che l'interazione tra i client e i servizi di rete interni al laboratorio virtuale replicasse fedelmente le dinamiche di un ambiente fisico, mantenendo al contempo l'isolamento necessario per eseguire test di sicurezza e sniffing di pacchetti a basso livello.
+    
+    Le impostazioni di VirtualBox permettono di allocare fino a quattro interfacce di rete per ogni macchina virtuale, ciascuna configurabile secondo diverse modalità operative: \texttt{NAT}, \texttt{Rete Interna}, \texttt{Bridge} e altre. In particolare, la modalità \texttt{Rete Interna} simula uno switch virtuale che collega tra loro solo le macchine associate allo stesso nome di rete interna, mentre con la modalità \texttt{NAT} le VM ottengono l’accesso controllato a Internet tramite il router virtuale incorporato nell'hypervisor. Questa flessibilità permette di replicare segmenti di LAN isolati, testare il routing tra subnet e simulare ambienti multihomed e polinodo ideali per l'analisi del traffico e degli attacchi.
+    
+    Un ulteriore livello di personalizzazione è offerto dalla possibilità di configurare manualmente l'indirizzo MAC di ciascuna interfaccia di rete, essenziale per la tracciabilità negli esperimenti di sicurezza, la gestione delle lease DHCP e il funzionamento degli strumenti di monitoraggio come DAI.
+    
+    Le istanze di calcolo virtuali sono state configurate impiegando la distribuzione Linux Debian, scelta per la sua rinomata stabilità, la sua natura interamente Open Source e la sua ridotta impronta operativa. La leggerezza del sistema operativo guest risulta essenziale per massimizzare l'efficienza nell'hypervisor, consentendo un impiego agile e l'uso di risorse hardware minime: ogni macchina virtuale è stata allocata con una memoria RAM nominale di 512 MB e un singolo core di processo. Questa parsimonia nell'allocazione delle risorse garantisce che le prestazioni del sistema di network monitoring non siano influenzate da sovraccarichi del sistema ospite.
+    
+    Ai fini della simulazione, sono state implementate quattro entità client che rappresentano i dispositivi terminali (\emph{end device}) della rete locale (LAN). Di queste, due sono designate come utenze legittime, configurate per operare in conformità ai protocolli di rete, una terza e una quarta possono essere assegnate a ruoli di attaccante, permettendo la validazione dell'efficacia reattiva dell'implementazione DAI sul router su più segmenti di rete. L'ultima istanza di calcolo virtuale viene designata come nodo principale della rete simulata, assumendo il ruolo di router: tale VM è configurata per erogare i servizi di rete essenziali (DHCP, DNS, NAT, IP forwarding, DAI) utilizzando tool come Dnsmasq e Netfilter/IPTables.
+    
+    In Tabella~\ref{tab:nodi_simulazione} è riassunta la composizione dell'ambiente virtuale per una fruizione immediata:
+    
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
+            \hline
+            \textbf{Nodo Virtuale} & \textbf{Ruolo nella Simulazione} & \textbf{Servizi/Funzioni Chiave} \\
+            \hline
+            Debian Router & Nodo principale della rete e Gateway & DHCP (\texttt{Dnsmasq}), DNS, NAT (\texttt{Netfilter/IPTables}), IP Forwarding, Daemon DAI \\
+            \hline
+            Debian 1 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime \\
+            \hline
+            Debian 2 (Attaccante) & Sorgente dell'attacco & Generazione di pacchetti ARP spoofed (ARP Poisoning) \\
+            \hline
+            Debian 3 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime/ruolo attaccante \\
+            \hline
+            Debian 4 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime/ruolo attaccante \\
+            \hline
+        \end{tabular}
+        \caption{Ruoli e Servizi dei Nodi nell'Ambiente di Simulazione}
+        \label{tab:nodi_simulazione}
+    \end{table}
+
+
+    \section{Topologia di Rete}
+    
+    La simulazione poggia su una topologia di rete volta a replicare un ambiente reale in cui sia possibile osservare fenomeni di routing, distribuzione di indirizzi tramite DHCP e attacchi ARP su segmenti di rete distinti. Per questo motivo, sono previste due configurazioni di riferimento: la prima, rappresentativa di una singola LAN, vede partecipare gli host appartenenti alla stessa rete, simulando lo scenario più semplice possibile; in secondo luogo, vengono incrementate le interfacce e configurati opportunamente i dispositivi per rappresentare una duplice rete e assistere a una simulazione più completa che possa essere scalabile.
+        
+    
+        \subsection{Scenario Base}
+        
+        Nel contesto iniziale, è predisposta una topologia composta da un router Debian e tre host client su una singola sottorete interna. Tutti i client sono connessi tramite la modalità \texttt{Rete Interna} (intnet1), formando una LAN privata isolata dal traffico esterno, come illustrato nella Figura~\ref{fig:topologia_base}.
+        
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=1\textwidth]{immagini/topologia_base.jpg}
+            \caption{Topologia di rete base con router Debian e quattro client su intnet1}
+            \label{fig:topologia_base}
+        \end{figure}
+        
+        La seguente tabella \ref{tab:nodi_descrizione_base} riassume i ruoli e le funzioni chiave dei nodi, mentre la tabella \ref{tab:nodi_configurazione_base} riassume la configurazione di indirizzi e servizi di questo scenario.
+        
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{4.5cm}|>{\raggedright\arraybackslash}p{5.8cm}|}
+                \hline
+                \textbf{Nodo Virtuale} & \textbf{Ruolo nella Simulazione} & \textbf{Servizi/Funzioni Chiave} \\
+                \hline
+                Debian Router & Nodo principale della rete e Gateway & DHCP (\texttt{Dnsmasq}), DNS, NAT (\texttt{Netfilter/IPTables}), IP Forwarding, Daemon DAI \\
+                \hline
+                Debian 1 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime \\
+                \hline
+                Debian 2 (Attaccante) & Sorgente dell'attacco & Generazione di pacchetti ARP spoofed (ARP Poisoning) \\
+                \hline
+                Debian 3 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime \\
+                \hline
+                Debian 4 (Client Legittimo) & End device (Utente conforme) & Richiesta DHCP, Operazioni legittime \\
+                \hline
+            \end{tabular}
+            \caption{Ruoli e Servizi dei Nodi nella Rete Singola}
+            \label{tab:nodi_descrizione_base}
+        \end{table}
+
+        
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|p{3cm}|p{4cm}|p{5cm}|}
+                \hline
+                \textbf{Nodo Virtuale} & \textbf{Interfaccia di Rete} & \textbf{Segmento} \\
+                \hline
+                Debian Router & enp0s8 & intnet1 (192.168.10.1) \\
+                \hline
+                Debian 1 & enp0s3 & intnet1 (192.168.10.x) \\
+                \hline
+                Debian 2 & enp0s3 & intnet1 (192.168.10.x) \\
+                \hline
+                Debian 3 & enp0s3 & intnet2 (192.168.10.x) \\
+                \hline
+                Debian 4 & enp0s3 & intnet2 (192.168.10.x) \\
+                \hline
+            \end{tabular}
+            \caption{Configurazione dei Nodi nello Scenario Base}
+            \label{tab:nodi_configurazione_base}
+        \end{table}
+        
+
+        
+        In questo contesto, la simulazione è in grado di offrire un primo scenario di test basilare sul funzionamento dell'infrastruttura e sugli attacchi ARP Spoofing in una LAN.
+
+        
+        \subsection{Scenario Multi-Rete}
+        
+        Per simulare scenari più complessi, la rete viene estesa aggiungendo una seconda sotto-rete interna (\texttt{intnet2}) e un ulteriore client. Si ottiene così una topologia parallela con due reti distinte (\texttt{192.168.10.0/24} e \texttt{192.168.20.0/24}), ciascuna presidiata dal router tramite opportune interfacce (\texttt{enp0s8} e \texttt{enp0s9}). In tale contesto, si possono orchestrare attacchi simultanei su sotto-reti diverse e verificare l'efficacia dell'applicativo DAI sia in condizioni isolate che in presenza di traffico misto.
+        
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.89\textwidth]{immagini/topologia_multirete.jpg}
+            \caption{Topologia multi-rete con router Debian e quattro client su intnet1 e intnet2}
+            \label{fig:topologia-multirete}
+        \end{figure}
+        
+        La tabella \ref{tab:nodi_configurazione_multirete} aggiornata per il nuovo scenario è la seguente:
+        
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|p{3cm}|p{4cm}|p{5cm}|}
+                \hline
+                \textbf{Nodo Virtuale} & \textbf{Interfaccia di Rete} & \textbf{Segmento} \\
+                \hline
+                Debian Router & enp0s8 / enpo0s9 & intnet1 (192.168.10.1) / intnet2 (192.168.20.1)\\
+                \hline
+                Debian 1 & enp0s3 & intnet1 (192.168.10.x) \\
+                \hline
+                Debian 2 & enp0s3 & intnet1 (192.168.10.x) \\
+                \hline
+                Debian 3 & enp0s3 & intnet2 (192.168.20.x) \\
+                \hline
+                Debian 4 & enp0s3 & intnet2 (192.168.20.x) \\
+                \hline
+            \end{tabular}
+            \caption{Configurazione dei Nodi nello Scenario Multi-Rete}
+            \label{tab:nodi_configurazione_multirete}
+        \end{table}
+        
+        Questo schema consente di valutare la difesa contro attacchi ARP su più segmenti simultaneamente, testare policy di routing e analizzare i log e l’efficacia del DAI Open Source in configurazioni realistiche.
+
+    \section[Configurazioni VM e Topologie]{Configurazioni delle Macchine Virtuali in Base alle Topologie di Rete}
+
+    Nella seguente sezione vengono presentate le configurazioni delle VM implementate in funzione delle topologie di rete precedentemente discusse. Di fatto, l'impiego dell'ambiente simulato presenta delle importanti variazioni in base alla topologia a cui si fa riferimento. 
+        
+
+    \subsection{Configurazione Client Debian Legittimi e Attaccante}
+        L'installazione dei client Debian, sia legittimi che di attacco, è stata progettata per mantenere il sistema il più leggero e pulito possibile, in modo da ridurre la probabilità di interferenze tra i servizi e preservare l'integrità delle prove di simulazione. Per questo motivo, si è proceduto all'installazione di ambiente minimale che prevede esclusivamente la presenza dell'utente \texttt{root} e di un utente normale, escludendo qualsiasi Desktop Environment (DE) o servizio superfluo rispetto a quelli essenziali della distribuzione base. In questo modo si ottiene un ambiente operativo snello, privo di applicazioni accessorie non necessarie, utile per focalizzarsi esclusivamente sui test di rete.
+        
+        Ai fini della configurazione di rete dei client, è stato modificato il file \path{/etc/network/interfaces}, impostando i parametri essenziali per la corretta gestione dell'interfaccia di rete. Di seguito si riporta un esempio di configurazione tipica:
+        
+        \begin{itemize}
+            \item Configurazione dell'interfaccia di loopback per garantire la connettività locale.
+            \item Configurazione dell'interfaccia principale (ad esempio \texttt{enp0s3}) con gestione dinamica tramite DHCP.
+            \item Supporto a IPv6 tramite auto-configurazione.
+        \end{itemize}
+        
+        Quest'impostazione garantisce una configurazione coerente e riproducibile, assicurando che ogni nodo partecipi correttamente alle operazioni di rete previste negli esperimenti di simulazione.
+        
+        Per quanto riguarda il nodo attaccante, è stato previsto un ulteriore passaggio: la realizzazione e l'installazione di un applicativo Python, denominato \texttt{ARPReply.py}, sviluppato ad hoc per la generazione di pacchetti ARP Reply falsificati. Questo tool sfrutta la libreria \texttt{Scapy}\footnote{\url{https://scapy.net/}} e consente di costruire e inviare pacchetti falsificati, impostando l'interfaccia, l'indirizzo IP e MAC di origine, il destinatario e il numero di pacchetti da inviare. Tramite questa soluzione, è possibile simulare un ARP Spoofing nella rete virtuale, fornendo una base concreta per l'analisi degli effetti e per la validazione dei meccanismi di difesa implementati, come quelli presentati nel capitolo successivo.
+        
+        \subsection{Configurazione del Router Debian e Applicativo DAI}
+        
+        La quarta macchina Debian viene installata come le precedenti: sistema minimale, senza un ambiente desktop né servizi aggiuntivi, con un solo utente \texttt{root} e un utente normale. Da qui si procede con modifiche mirate per trasformarla in un router multifunzione e host del servizio DAI Open Source.
+            
+            \subsubsection{Interfacce di rete e schema VMBox}
+
+            Come illustrato in Tabella~\ref{tab:vmbox-schema}, la macchina router è collegata tramite quattro interfacce di rete: la principale con modalità NAT per l'accesso a internet tramite la macchina host, le altre in modalità "Rete Interna" per la comunicazione tra host privati.
+
+            \begin{table}[htbp]
+                \centering
+                \begin{tabular}{|l|l|l|l|}
+                    \hline
+                    \textbf{Interfaccia} & \textbf{Tipo} & \textbf{Bridge}      & \textbf{Descrizione} \\
+                    \hline
+                    enp0s3              & NAT           & -                    & Accesso internet Host \\
+                    enp0s8              & Rete Interna  & intnet1              & Connessione rete interna \\
+                    \hline
+                \end{tabular}
+                \caption{Schema Interfacce di Rete VMBox}
+                \label{tab:vmbox-schema}
+            \end{table}
+
+            Il file \path{/etc/network/interfaces} riflette questa topologia. Di seguito, un estratto delle principali configurazioni:
+
+            \begin{minted}[
+                frame=lines,
+                framesep=1mm,
+                baselinestretch=1,
+                bgcolor=codebg,
+                fontsize=\footnotesize
+            ]{text}
+            auto lo
+            iface lo inet loopback
+
+            auto enp0s3
+            iface enp0s3 inet dhcp
+
+            auto enp0s8
+            iface enp0s8 inet static
+                address 192.168.10.1
+                netmask 255.255.255.0
+            \end{minted}
+
+            Questa configurazione consente di gestire separatamente le comunicazioni verso ciascun client e verso l’esterno. \texttt{192.168.10.1} è l'indirizzo statico per identificare il Gateway e quindi il Router.
+
+            \subsubsection{Servizi fondamentali: DNS/DHCP con Dnsmasq}
+
+            Il servizio \texttt{Dnsmasq} è configurato per fornire DHCP e DNS locale. Di seguito, un estratto dal file di configurazione \path{/etc/dnsmasq.conf}:
+
+            \begin{minted}[
+                frame=lines,
+                framesep=1mm,
+                baselinestretch=1,
+                bgcolor=codebg,
+                fontsize=\footnotesize
+            ]{text}
+            interface=enp0s8
+            dhcp-range=192.168.10.10,192.168.10.20,24h
+            dhcp-option=option:router,192.168.10.1
+            dhcp-option=option:dns-server,8.8.8.8
+            \end{minted}
+
+            Questi parametri consentono la distribuzione automatica di indirizzi IP e gateway per i client. In particolare, viene impostato un range di leasing degli IP da \texttt{192.168.10.100} a \texttt{192.168.10.200} e dati i riferimenti IP del Gateway e del server DNS.
+
+            \subsubsection{Sysctl: abilitazione forwarding e protezione spoofing}
+
+            Nel file \path{/etc/sysctl.conf}, come mostrato di seguito, viene attivato il forwarding IPv4 per permettere alla macchina di impersonare il comportamento di un router:
+
+            \begin{minted}[
+                frame=lines,
+                framesep=1mm,
+                baselinestretch=1,
+                bgcolor=codebg,
+                fontsize=\footnotesize
+            ]{text}
+            net.ipv4.ip_forward=1
+            \end{minted}
+
+            Questa impostazione è di primaria importanza per permettere l'inoltro dei pacchetti secondo le regole stabilite nel punto seguente.
+
+            \subsubsection{IPTables: NAT e filtri di sicurezza}
+
+            Per garantire l'accesso ad Internet agli host interni e controllare il traffico tra le reti, il router Debian utilizza iptables per la gestione del NAT (Network Address Translation) e del forwarding. La principale regola del NAT applica il mascheramento alle connessioni in uscita verso la rete esterna (internet), consentendo ai dispositivi delle reti interne di condividere un unico indirizzo IP pubblico:
+
+            \begin{minted}[
+                frame=lines,
+                framesep=1mm,
+                baselinestretch=1,
+                bgcolor=codebg,
+                fontsize=\footnotesize
+            ]{text}
+            # NAT per accesso Internet dagli host interni
+            iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE
+            \end{minted}
+
+            Questa regola dice al router di “nascondere” (mascherare) tutti i pacchetti che escono dall'interfaccia {\tt enp0s3} (collegata alla rete esterna), sostituendo l'indirizzo sorgente con quello del router stesso. In questo modo, più host interni possono comunicare con l'esterno usando lo stesso indirizzo IP pubblico.
+
+            Per consentire il traffico tra le reti interne e verso internet, si aggiungono regole di forwarding specifiche. Ad esempio:
+
+            \begin{minted}[
+                frame=lines,
+                framesep=1mm,
+                baselinestretch=1,
+                bgcolor=codebg,
+                fontsize=\footnotesize
+            ]{text}
+            # Forwarding sulle interfacce interne
+            iptables -A FORWARD -i enp0s8 -o enp0s3 -j ACCEPT
+            \end{minted}
+
+            Questa regola consente ai pacchetti provenienti dall'interfaccia interna \texttt{enp0s8} (ad esempio, la rete 192.168.10.0/24) di essere inoltrati verso l'esterno tramite \texttt{enp0s3}. In configurazioni multi-subnet, viene creata una regola analoga per ciascun segmento di rete interna che deve avere accesso a Internet o comunicare con altre sottoreti tramite il router.
+
+            Ulteriori regole possono essere aggiunte per:
+            \begin{itemize}
+                \item Limitare o filtrare il traffico tra le subnet interne secondo policy di sicurezza.
+                \item Bloccare il traffico non autorizzato proveniente dall'esterno o tra host interni.
+                \item Implementare segmentazione, isolamento e logging.
+            \end{itemize}
+
+            In sintesi, queste opzioni permettono un controllo granulare sul routing, favorendo sia la sicurezza sia la connettività, adattando il comportamento del router alle esigenze dell’infrastruttura.
+            
+                        
+            \subsubsection{Applicativo DAI Open Source}
+            
+            Infine, è il caso di menzionare che in questa macchina viene avviato il servizio ad hoc di Dynamic ARP Inspection. Il servizio si occuperà di monitorare i pacchetti ARP Reply ricevuti sulle interfacce interne, ovvero \texttt{enp0s8}, confrontando gli indirizzi MAC e IP dichiarati con le lease DHCP gestite da \texttt{Dnsmasq}, rilevando i tentativi di ARP poisoning. 
+        
+        
+        
+    
+        
+        \subsection{Configurazione del Router Debian e Client nello Scenario Multi-Rete}
+
+        Nel contesto multi-rete, il router Debian è dotato di una seconda interfaccia interna, \texttt{enp0s9}, dedicata alla gestione della subnet \texttt{192.168.20.0/24}. Oltre alla rete interna \texttt{intnet1} (collegata a \texttt{enp0s8}), viene creata la ``Rete Interna'' \texttt{intnet2} , su cui si collegano i nuovi host virtuali, replicando la segmentazione tipica delle infrastrutture reali.
+
+        La tabella \ref{tab:vmbox-multirete} seguente mostra la nuova topologia delle interfacce:
+
+        \begin{table}[htbp]
+            \centering
+            \begin{tabular}{|l|l|l|l|}
+                \hline
+                \textbf{Interfaccia} & \textbf{Tipo} & \textbf{Rete Interna} & \textbf{Descrizione} \\
+                \hline
+                enp0s3 & NAT & - & Accesso internet Host \\
+                enp0s8 & Rete Interna & intnet1 & Connessione subnet 192.168.10.0/24 \\
+                enp0s9 & Rete Interna & intnet2 & Connessione subnet 192.168.20.0/24 \\
+                \hline
+            \end{tabular}
+            \caption{Schema interfacce di rete VMBox in scenario multi-rete}
+            \label{tab:vmbox-multirete}
+        \end{table}
+
+        Il file \path{/etc/network/interfaces} del router viene quindi modificato come segue:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{text}
+        auto enp0s8
+        iface enp0s8 inet static
+            address 192.168.10.1
+            netmask 255.255.255.0
+
+        auto enp0s9
+        iface enp0s9 inet static
+            address 192.168.20.1
+            netmask 255.255.255.0
+        \end{minted}
+
+        Il servizio \texttt{Dnsmasq} è configurato per fornire DHCP in entrambe le sottoreti\footnote{L'opzione \texttt{set/tag} viene abilitata per permettere a Dnsmasq di riconoscere le \texttt{dhcp-option} per ognuna delle interfacce.}, con opzioni differenziate per ciascuna interfaccia:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{text}
+        interface=enp0s8
+        dhcp-range=set:enp0s8.192.168.10.10,192.168.10.20,24h
+        dhcp-option=:tag:enp0s8option,router,192.168.10.1
+        dhcp-option=tag:enp0s8option:,dns-server,8.8.8.8
+
+        interface=enp0s9
+        dhcp-range=set:enp0s9,192.168.20.20,192.168.20.30,24h
+        dhcp-option=tag:enp0s9,option:router,192.168.20.1
+        dhcp-option=tag:enp0s9,option:dns-server,8.8.8.8
+        \end{minted}
+
+        Le regole \texttt{iptables} vengono adattate per consentire sia la comunicazione tra host interni e internet, sia tra le due reti private, secondo le policy di sicurezza stabilite:
+
+        \begin{minted}[
+            frame=lines,
+            framesep=1mm,
+            baselinestretch=1,
+            bgcolor=codebg,
+            fontsize=\footnotesize
+        ]{text}
+        iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE
+
+        iptables -A FORWARD -i enp0s8 -o enp0s3 -j ACCEPT
+        iptables -A FORWARD -i enp0s9 -o enp0s3 -j ACCEPT
+
+        iptables -A FORWARD -i enp0s8 -o enp0s9 -j ACCEPT
+        iptables -A FORWARD -i enp0s9 -o enp0s8 -j ACCEPT
+        \end{minted}
+
+        In questa configurazione, ciascuna interfaccia gestisce una propria subnet; il router, tramite il forwarding e le regole NAT, consente agli host delle due reti di comunicare tra loro e con l'esterno, mantenendo una separazione logica e applicando le opzioni di sicurezza definite in base alle esigenze dell'infrastruttura. Il servizio DAI viene configurato per monitorare entrambi i segmenti di rete, rilevando tentativi di attacco ARP in entrambi i domini; verrà argomentato come nel capitolo seguente.
