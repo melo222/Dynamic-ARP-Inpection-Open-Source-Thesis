@@ -1,8 +1,8 @@
 \chapter{Testing ed Evidenze}
     % \section{Prerequisiti e assunzioni}
         
-    \section{Criteri ed Obbiettivi}
-    \label{sez:criteri_obbiettivi}
+    \section{Criteri ed Obiettivi}
+    \label{sez:criteri_obiettivi}
 
     La validazione di un sistema di sicurezza di rete come il \textit{Dynamic ARP Inspection} (DAI) non può limitarsi alla sola verifica funzionale della correttezza logica (i.e., il blocco di un pacchetto malevolo), ma deve necessariamente includere un'analisi quantitativa delle prestazioni. Essendo il DAI un componente che opera in linea sul traffico di rete a Livello 2, qualsiasi inefficienza nel codice si tradurrebbe in latenza per l'utente finale o, nel caso peggiore, in perdita di pacchetti legittimi e interruzione del servizio.
     
@@ -50,7 +50,7 @@
     \section{Strumentazione Integrata nel Software per il Testing}
     \label{cap:strumentaz_testing}
 
-    Per ottenere le metriche definite nella sezione \ref{sez:criteri_obbiettivi} senza alterare significativamente le prestazioni del sistema è stato necessario "attrezzare" il codice sorgente.
+    Per ottenere le metriche definite nella sezione \ref{sez:criteri_obiettivi} senza alterare significativamente le prestazioni del sistema è stato necessario "attrezzare" il codice sorgente.
     L'approccio adottato consiste nell'introduzione di strumenti di misurazione a basso livello e nell'implementazione di un thread dedicato esclusivamente alla raccolta e alla memorizzazione dei dati statistici su file CSV. Viene prediletto tale formato di file per la raccolta di dati in un formato facilmente integrabile in diagrammi e infografica.
     
     Di seguito vengono descritti i moduli implementativi introdotti per il testing.

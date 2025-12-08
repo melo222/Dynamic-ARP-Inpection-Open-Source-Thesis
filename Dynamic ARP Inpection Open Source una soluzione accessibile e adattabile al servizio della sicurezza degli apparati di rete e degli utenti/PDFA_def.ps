@@ -1,0 +1,30 @@
+%!
+% Define the ICC profile file name
+/ICCProfile (sRGB.icc) def
+
+% Define the OutputConditionIdentifier
+/OutputConditionIdentifier (sRGB) def
+
+% Define the OutputCondition
+/OutputCondition (sRGB IEC61966-2.1) def
+
+% Define the RegistryName
+/RegistryName (http://www.color.org) def
+
+/CustomProfile ICCProfile (r) file def
+
+/pdfmark where { pop } { /pdfmark { cleartomark } bind def } ifelse
+
+[{
+  /_objdef {icc_PDF} /type /stream /OBJ pdfmark
+  [{icc_PDF} <</N 3 >> /PUT pdfmark
+  [{icc_PDF} CustomProfile /PUT pdfmark
+  [{Catalog} <</OutputIntents [ {
+    /Type /OutputIntent
+    /S /GTS_PDFA1
+    /DestOutputProfile {icc_PDF}
+    /OutputConditionIdentifier OutputConditionIdentifier
+    /OutputCondition OutputCondition
+    /RegistryName RegistryName
+  } ]>> /PUT pdfmark
+] { } forall

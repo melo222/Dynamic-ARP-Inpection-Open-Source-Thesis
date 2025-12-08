@@ -27,7 +27,7 @@
 
         Il modulo HARPI (Hybrid ARP Inspection) combina infine le funzionalità di SARPI e DARPI, gestendo in modo diverso le associazioni statiche e quelle dinamiche all'interno della stessa rete.
 
-        Questa soluzione non è esente da difetti, in quanto presenta le stesse difficoltà di implementazione della precedente in reti eterogenee e con un alto ricambio degli host. Inoltre, è necessario disabilitare a livello di sistema operativo l'accettazione delle gratuitous Reply, ovvero le ARP Reply senza una ARP Request precedente. 
+        Questa soluzione non è esente da difetti, in quanto presenta le stesse difficoltà di implementazione della precedente in reti eterogenee e con un alto ricambio degli host. Inoltre, è necessario disabilitare a livello di sistema operativo l'accettazione delle gratuitous Reply, ovvero messaggi ARP Reply non sollecitati da una precedente ARP Request.. 
 
         % \begin{figure}
         %     \centering
@@ -286,7 +286,7 @@
     
     \section{L'idea di una Dynamic ARP Inspection più fruibile}
 
-    Secondo quanto discusso nella sezione precedente, la funzionalità "Dynamic ARP Inspection" merita un'implementazione meno costosa ma senza perdite di efficacia sia in termini di sicurezza che di prestazioni. L'oggetto di questo elaborato di tesi è la realizzazione di questa idea: un DAI sviluppato con l'obiettivo di superare le limitazioni dell'ambito enterprise in cui è stato confinato fino ad ora. Si tratta di una funzione integrabile in un ampia gamma di dispositivi di rete, distribuendo questo potente controllo di socurezza per il bene di tutti gli utenti, ed aumentando la sicurezza di molte realtà aziendali e private, 
+    Secondo quanto discusso nella sezione precedente, la funzionalità "Dynamic ARP Inspection" merita un'implementazione meno costosa ma senza perdite di efficacia sia in termini di sicurezza che di prestazioni. L'oggetto di questo elaborato di tesi è la realizzazione di questa idea: un modulo DAI progettato per superare le barriere di adozione tipiche dell'ambito enterprise. Si tratta di una funzione integrabile in un ampia gamma di dispositivi di rete, distribuendo questo potente controllo di socurezza per il bene di tutti gli utenti, ed aumentando la sicurezza di molte realtà aziendali e private, 
     
     La scelta della modalità di sviluppo ricade sul paradigma fruibile per definizione, ovvero l'Open Source. Questo paradigma verrà approfondito nel capitolo seguente per una comprensione ottimale. 
 

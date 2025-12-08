@@ -1,26 +1,60 @@
 \documentclass[12pt]{report}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
 
 \begin{document}
+% Non usiamo \chapter* per avere controllo totale sul layout
+\thispagestyle{plain} % Mantiene il numero di pagina in basso (o empty se non lo vuoi)
+\addcontentsline{toc}{chapter}{Riassunto} % Aggiunge comunque la voce all'indice
 
-\chapter*{Riassunto Dynamic ARP Inspection Open Source}
-\addcontentsline{toc}{chapter}{Riassunto}
+% --- INIZIO INTESTAZIONE PERSONALIZZATA ---
+% \vspace*{-2.5cm}
 
-Il presente elaborato di tesi affronta una delle criticità più persistenti e pervasive nella sicurezza delle reti locali (LAN): la vulnerabilità intrinseca dell'\textbf{Address Resolution Protocol (ARP)}. Progettato in un'epoca in cui la fiducia tra i nodi di rete era un assunto implicito, ARP manca di meccanismi nativi di autenticazione, esponendo le infrastrutture moderne a rischi severi quali l'\textbf{ARP Cache Poisoning} e i conseguenti attacchi \textbf{Man-in-the-Middle (MITM)}. Sebbene l'industria del networking abbia risposto con soluzioni efficaci, in primis la \textit{Dynamic ARP Inspection} (DAI) integrata negli apparati di fascia Enterprise (es. Cisco Catalyst), l'accesso a tali tecnologie rimane precluso a una vasta porzione di utenza a causa degli elevati costi di licenza e hardware.
+\begin{center}
+    % Titolo
+    {\Large \textbf{Dynamic ARP Inspection Open Source}\par}
+    {\Large \textbf{una soluzione accessibile e adattabile al servizio della sicurezza degli apparati di rete e degli utenti}\par}
+    
+    \vspace{1.5cm} % Spazio tra titolo e autore
+    
+    % Autore
+    {\textbf{Alessandro Meloni} (matricola 984857)}
+    
+    \vspace{0.5cm} % Spazio tra autore e relatore
+    
+    % Relatore (Centrato poiché non c'è correlatore, risulta più elegante)
+    {\textbf{Relatore:} Prof. Ernesto Damiani}
+\end{center}
+
+\vspace{1cm} % Spazio prima dell'inizio del testo
+% --- FINE INTESTAZIONE ---
+
+Il presente elaborato di tesi affronta una delle criticità più persistenti nella sicurezza delle reti locali (LAN): la vulnerabilità intrinseca dell'\textbf{Address Resolution Protocol (ARP)}.
+Progettato in un'epoca di fiducia implicita tra i nodi, ARP manca di meccanismi nativi di autenticazione, esponendo le infrastrutture a rischi severi quali l'\textbf{ARP Cache Poisoning} e i conseguenti attacchi \textbf{Man-in-the-Middle (MITM)}.
+Sebbene l'industria abbia risposto con soluzioni efficaci come la \textit{Dynamic ARP Inspection} (DAI) integrata negli apparati Enterprise (es. Cisco Catalyst), l'accesso a tali tecnologie rimane precluso a una vasta utenza a causa degli elevati costi di licenza e hardware.
 
 L'obiettivo primario di questo lavoro è colmare tale divario tecnologico ed economico, proponendo un cambio di paradigma: la democratizzazione della sicurezza di livello 2 attraverso lo sviluppo di una soluzione \textbf{Dynamic ARP Inspection Open Source}. 
-Come discusso approfonditamente nel capitolo 2, e in particolare nella sezione 2.4, la sicurezza non deve essere un privilegio accessorio riservato alle grandi infrastrutture aziendali, ma un requisito fondamentale integrabile in dispositivi eterogenei e accessibili. Questo progetto dimostra come sia possibile replicare, e potenzialmente estendere, le logiche di validazione delle soluzioni proprietarie utilizzando software aperto, trasparente e verificabile, svincolando l'amministratore di rete dal \textbf{vendor lock-in} e restituendo il controllo sull'integrità del traffico locale.
+Come discusso approfonditamente nel capitolo 2, e in particolare nella sezione 2.4, la sicurezza non deve essere un privilegio accessorio riservato alle grandi infrastrutture aziendali, ma un requisito fondamentale integrabile in dispositivi eterogenei e accessibili. Questo progetto dimostra come sia possibile replicare le logiche di validazione delle soluzioni proprietarie utilizzando software aperto, trasparente e verificabile, svincolando l'amministratore di rete dal \textbf{vendor lock-in}.
 
-Sotto il profilo ingegneristico, la tesi descrive l'intero ciclo di vita del software, dalla progettazione architetturale all'implementazione in linguaggio \textbf{C}. La scelta del linguaggio e l'adozione di librerie standard come \textbf{Libpcap} e \textbf{POSIX Threads} rispondono a requisiti stringenti di performance e portabilità. L'architettura del daemon sviluppato si basa sul pattern concorrente \textbf{Produttore-Consumatore}, una scelta progettuale critica per disaccoppiare l'acquisizione dei pacchetti ad alta frequenza dalla logica di validazione.
-Il sistema opera intercettando selettivamente le trame ARP Reply in transito sul gateway, sottoponendole a una verifica rigorosa: validazione di presenza nella tabella dei lease DHCP. Implementando una politica di sicurezza \textbf{Deny-by-Default}, il software considera qualsiasi messaggio ARP illegittimo fino a prova contraria, ovvero il presentare un'associazione $\langle \mbox{IP, MAC} \rangle$ presente nelle Lease DHCP. Particolare enfasi è stata posta sull'ottimizzazione delle strutture dati e sulla gestione della memoria. L'implementazione di una coda circolare (\textbf{Ring Buffer}) thread-safe e l'uso di primitive di sincronizzazione (\textbf{Mutex} e \textbf{Condition Variables}) hanno permesso di eliminare le attese attive, massimizzando l'efficienza della CPU. 
+Sotto il profilo ingegneristico, la tesi descrive l'intero ciclo di vita del software, dalla progettazione architetturale all'implementazione in linguaggio \textbf{C}. La scelta del linguaggio e l'adozione di librerie standard come \textbf{Libpcap} e \textbf{POSIX Threads} rispondono a requisiti stringenti di performance e portabilità. L'architettura del daemon sviluppato si basa sul pattern concorrente \textbf{Produttore-Consumatore}, implementando un \textbf{thread ricevitore} dedicato per ogni interfaccia di ascolto e un \textbf{pool di thread analizzatori} per la gestione parallela del carico delle validazioni. Tale configurazione rappresenta una scelta progettuale critica per disaccoppiare l'acquisizione dei pacchetti ad alta frequenza dalla logica di validazione, ottimizzando l'allocazione delle risorse di calcolo.
 
-La validazione sperimentale, condotta in un ambiente virtualizzato complesso che simula topologie multi-LAN e scenari di attacco reali, ha prodotto evidenze quantitative significative. I test di carico hanno dimostrato come l'architettura multi-thread sia in grado di sostenere flood di oltre \textbf{34.000 PPS} mantenendo una latenza media di elaborazione nell'ordine dei microsecondi (\textbf{13-15 $\boldsymbol{\mu}$s})), un miglioramento di due ordini di grandezza rispetto alle implementazioni sequenziali.
-Inoltre, il sistema ha dimostrato un'eccellente resilienza: anche in condizioni di \textbf{Denial of Service} su un segmento di rete, il traffico legittimo sugli altri segmenti viene preservato e processato senza perdite, confermando la robustezza della logica di isolamento dei flussi.
+Il sistema intercetta selettivamente le trame ARP Reply in transito sul gateway, sottoponendo le loro associazioni $\langle \mbox{IP, MAC} \rangle$ a una verifica rigorosa. Implementando una politica di sicurezza \textbf{Deny-by-Default}, il software considera qualsiasi messaggio ARP illegittimo fino a prova contraria, ovvero la presenza di un'associazione $\langle \mbox{IP, MAC} \rangle$ equivalente nelle Lease DHCP. 
 
-In conclusione, questo lavoro trascende la mera implementazione tecnica per delineare una strategia concreta di democratizzazione della sicurezza. I risultati empirici confermano il raggiungimento di prestazioni \textbf{Real-Time} su hardware non professionale, colmando l'attuale divario tra le costose soluzioni Enterprise e i dispositivi consumer intrinsecamente vulnerabili. La compatibilità nativa con l'ecosistema Linux Embedded, e in particolare la sinergia con la gestione dei lease di \textbf{Dnsmasq}, elegge piattaforme comunitarie come \textbf{OpenWrt} a servizio del futuro del progetto. Tale integrazione permetterebbe di estendere una protezione avanzata di livello 2 a contesti critici ma spesso privi di budget dedicato, quali le \textbf{Piccole e Medie Imprese (PMI)}, gli ambienti domestici evoluti (\textbf{Home Lab} e \textbf{Smart Working}) e le \textbf{Reti Civiche}, concretizzando la visione di:
+Particolare enfasi è stata posta sull'ottimizzazione delle strutture dati e sulla gestione delle risorse. L'implementazione di una coda circolare (\textbf{Ring Buffer}) thread-safe e l'uso mirato di primitive di sincronizzazione (\textbf{Mutex} e \textbf{Condition Variables}) hanno permesso di eliminare le attese attive, garantendo l'utilizzo essenziale della CPU. 
+
+La validazione sperimentale, condotta in un ambiente virtualizzato complesso che simula topologie multi-LAN e scenari di attacco reali, ha prodotto evidenze quantitative significative. I test di carico hanno dimostrato come l'architettura multi-thread sia in grado di sostenere flood di oltre \textbf{34.000 PPS} mantenendo una latenza media di elaborazione nell'ordine dei microsecondi (\textbf{13-15 $\boldsymbol{\mu}$s}), un miglioramento di due ordini di grandezza rispetto alle implementazioni sequenziali. 
+
+Tali risultati confermano la risoluzione delle criticità di saturazione, prevenendo il fenomeno del \textbf{Bufferbloat} e garantendo che l'aumento della dimensione della coda si traduca in resilienza effettiva anziché in latenza aggiuntiva. Inoltre, il sistema ha dimostrato eccellente capacità di isolamento: anche in condizioni di \textbf{Denial of Service} massiccio su un segmento di rete, il traffico legittimo sugli altri segmenti viene preservato e processato senza perdite, confermando la robustezza del design anche in scenari di routing complesso.
+
+In conclusione, questo lavoro trascende l'implementazione tecnica per delineare una strategia concreta di democratizzazione della sicurezza. I risultati empirici confermano il raggiungimento di prestazioni \textbf{Real-Time} su hardware non professionale, colmando l'attuale divario tra le costose soluzioni Enterprise e i dispositivi consumer intrinsecamente vulnerabili. 
+La compatibilità nativa con l'ecosistema Linux Embedded, e in particolare la sinergia con la gestione dei lease di \textbf{Dnsmasq}, elegge piattaforme comunitarie come \textbf{OpenWrt} a servizio del futuro del progetto. 
+
+Tale integrazione permetterebbe di estendere una protezione avanzata di livello 2 a contesti critici: supportando le \textbf{Piccole e Medie Imprese (PMI)} nell'abbattimento delle barriere economiche verso la sicurezza infrastrutturale aziendale; blindando gli ambienti domestici evoluti (\textbf{Home Lab} e \textbf{Smart Working}) con tutele professionali su dispositivi commerciali; e potenziando le \textbf{Infrastrutture della Pubblica Amministrazione Locale}, dove l'efficienza su hardware a risorse limitate permette di garantire la sicurezza della rete territoriale come diritto fondamentale del cittadino, concretizzando la visione di:
 \begin{center}
-\textit{"Una sicurezza informatica non più intesa come privilegio economico, ma come bene comune accessibile e a servizio degli utenti finali"}.
+\textit{"Una sicurezza informatica non più intesa come privilegio economico, ma come bene comune accessibile al servizio degli utenti finali"}.
 \end{center}
+
+
 
 \end{document}

@@ -112,7 +112,7 @@ Nel seguente capitolo viene descritta in dettaglio l'implementazione open source
     È fondamentale che anche la funzione di lookup acquisisca il Mutex della cache. Sebbene il thread analizzatore non modifichi la cache, l'acquisizione del Mutex impedisce che l'operazione di lookup avvenga simultaneamente all'operazione di swap da parte del thread updater. Tale sincronizzazione garantisce che ogni ricerca avvenga su una struttura dati integra e coerente. Il risultato (TRUE o FALSE) viene quindi restituito al thread analizzatore per la decisione finale di sicurezza, come discusso nel capitolo precedente.
     
     \section{Dettagli Implementativi e Struttura del Codice Sorgente}
-    Nella presente sezione si presenta il cuore dei file sorgenti che compongono il programma. Ovviamente, tenuto conto della lunghezza, verranno presentati degli estratti delle principali funzionalità con relative descrizioni.
+    Nella presente sezione si presenta il cuore dei file sorgenti che compongono il programma. Considerata l'estensione del codice sorgente, in questa sezione verranno presentati e discussi i soli estratti significativi delle principali funzionalità con relative descrizioni.
 
         \subsection{Implementazione del Receiver}
 
